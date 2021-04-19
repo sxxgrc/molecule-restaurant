@@ -54,8 +54,6 @@ def generate_hiv_classifier():
     # Prepare the train and test data.
     train_loader, test_loader = prepare_train_test_data()
 
-    for data in train_loader:
-        print(data.features)
-        exit()
+    # max num bonds = 9
 
 generate_hiv_classifier()

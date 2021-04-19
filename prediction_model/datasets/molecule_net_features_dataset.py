@@ -1,9 +1,9 @@
-import torch, re, os
+import torch, re, os, numpy
 
 from torch_geometric.datasets import MoleculeNet
 from torch_geometric.data import Data, download_url, extract_gz
 
-from chemprop.features import morgan_counts_features_generator
+from chemprop.features import morgan_binary_features_generator
 from chemprop.data import StandardScaler
 
 from rdkit import Chem
@@ -145,12 +145,16 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
             if edge_index.numel() > 0:
                 perm = (edge_index[0] * x.size(0) + edge_index[1]).argsort()
                 edge_index, edge_attr = edge_index[:, perm], edge_attr[perm]
-            
-            # Generate feature vector for molecule.
-            features = morgan_counts_features_generator(mol)
 
+            # Generate feature vector for molecule.
+            features = morgan_binary_features_generator(mol)
+
+            # Get number of edges for molecules.
+            num_bonds = [len(mol.GetBonds())]
+
+            # Create data item for this molecule.
             data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y,
-                        smiles=smiles, features=features)
+                        smiles=smiles, features=features, num_bonds=num_bonds)
 
             if self.pre_filter is not None and not self.pre_filter(data):
                 continue
@@ -166,6 +170,6 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
         scaler.fit(all_features)
 
         for d in data_list:
-            d.features = scaler.transform(d.features.reshape(1, -1)[0])
+            d.features = torch.tensor(scaler.transform(d.features.reshape(1, -1)[0]), dtype=torch.long)
 
         torch.save(self.collate(data_list), self.processed_paths[0])
