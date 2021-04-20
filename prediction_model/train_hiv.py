@@ -10,6 +10,8 @@ from splitters import ScaffoldSplitter
 
 from torch_geometric.data import DataLoader
 
+from torch import nn
+
 # Data path to store the dataset to train on.
 DATA_PATH = str(Path().absolute()) + "/prediction_model/data"
 
@@ -31,22 +33,6 @@ def prepare_train_test_data(frac_train=0.8, frac_test=0.2):
 
     return train_loader, test_loader
 
-
-"""
-Tests the D-MPNN model using the given test dataloader.
-"""
-def test_model(test_loader, model_parameters):
-    print("hi")
-
-
-
-"""
-Trains the D-MPNN model using the given train dataloader.
-"""
-def train_model(train_loader, model_parameters):
-    print("hi")
-
-
 """
 Main method for generating the fully trained HIV classifier.
 """
@@ -54,6 +40,6 @@ def generate_hiv_classifier():
     # Prepare the train and test data.
     train_loader, test_loader = prepare_train_test_data()
 
-    # max num bonds = 9
+    loss_func = nn.BCEWithLogitsLoss(reduction="none")
 
 generate_hiv_classifier()

@@ -21,30 +21,22 @@ class DMPNNEncoder(nn.Module):
         super(DMPNNEncoder, self).__init__()
 
         # Model arguments.
-        self.bias = args.bias
-        self.dropout_prob = args.dropout_prob
         self.message_passing_depth = args.message_passing_depth
-        self.torch_device = args.torch_device
-        self.hidden_size = args.hidden_size
-
-        # Main input arguments.
-        self.atom_dim = atom_dim
-        self.bond_dim = bond_dim
 
         # Dropout layer.
-        self.dropout_layer = nn.Dropout(self.dropout_prob)
+        self.dropout_layer = nn.Dropout(args.encoder_dropout_prob)
 
         # Activation function for the linear networks in the model.
         self.relu = nn.ReLU()
 
         # Input linear model W_i used to calculate h0.
-        self.W_i = nn.Linear(self.atom_dim + self.bond_dim, self.hidden_size, bias=self.bias)
+        self.W_i = nn.Linear(atom_dim + bond_dim, args.hidden_size)
 
         # Inner hidden linear model W_m used to calculate h{t+1}.
-        self.W_m = nn.Linear(self.hidden_size, self.hidden_size, bias=self.bias)
+        self.W_m = nn.Linear(args.hidden_size, args.hidden_size)
 
         # Output linear model W_a used to calculate h{v}, the molecular representation of the result.
-        self.W_a = nn.Linear(self.atom_dim + self.hidden_size, self.hidden_size, bias=self.bias)
+        self.W_a = nn.Linear(atom_dim + args.hidden_size, args.hidden_size)
     
     """
     Generates a mapping of each atom to the indices of the bonds coming into that atom.
@@ -84,10 +76,7 @@ class DMPNNEncoder(nn.Module):
     Specifically computes: m_{t+1} for bond {v, w} = sum of h_t for all incoming bonds to atom v
     except for the bond {w, v}
     """
-    def compute_next_bond_message(self, h_t, a2b, b2a, b2rev):
-        # Expand the atom to incoming bond map for all of the bonds in h_t.
-        bond_incoming_bond_map = torch.index_select(a2b, 0, b2a)
-
+    def compute_next_bond_message(self, h_t, a2b, bond_incoming_bond_map, b2rev):
         # Add a zero vector to top of h_t to allow for padding.
         padded_h_t = torch.cat((torch.tensor([[0]]).expand(1, h_t.shape[1]), h_t), dim=0)
 
@@ -125,14 +114,17 @@ class DMPNNEncoder(nn.Module):
         # Get mapping of each atom to the indices of incoming bonds to that atom.
         a2b = self.get_atom_incoming_bond_map(batch_molecules.x.shape[0], 
             batch_molecules.edge_index[1])
+        
+        # Expand the atom to incoming bond map for all of the bonds in the dataset.
+        bond_incoming_bond_map = torch.index_select(a2b, 0, b2a)
 
         # Get mapping of each bond to the index of its reverse.
         b2rev = self.get_bond_reverse_map(batch_molecules.edge_index)
 
         # Message passing phase.
-        for _ in range(self.depth):
+        for _ in range(self.message_passing_depth):
             # Compute the next message for each edge.
-            m_t = self.compute_next_bond_message(h_t, a2b, b2a, b2rev)
+            m_t = self.compute_next_bond_message(h_t, a2b, bond_incoming_bond_map, b2rev)
 
             # Compute the next hidden state for each edge.
             h_t = self.relu(h_0 + self.W_m(m_t))
@@ -147,6 +139,7 @@ class DMPNNEncoder(nn.Module):
         # Get the atom-wise representation of hidden states by concating node features to node messages.
         node_feat_message = torch.cat((batch_molecules.x, m_v), dim=1)
         h_v = self.relu(self.W_a(node_feat_message))
+        h_v = self.dropout_layer(h_v)
 
         # Readout phase, which creates the molecule representation from the atom representations.
         h = torch.sum(h_v, dim=0)
