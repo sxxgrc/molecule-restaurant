@@ -76,7 +76,7 @@ class DMPNNEncoder(nn.Module):
     Specifically computes: m_{t+1} for bond {v, w} = sum of h_t for all incoming bonds to atom v
     except for the bond {w, v}
     """
-    def compute_next_bond_message(self, h_t, a2b, bond_incoming_bond_map, b2rev):
+    def compute_next_bond_message(self, h_t, max_num_bonds, bond_incoming_bond_map, b2rev):
         # Add a zero vector to top of h_t to allow for padding.
         padded_h_t = torch.cat((torch.tensor([[0]]).expand(1, h_t.shape[1]), h_t), dim=0)
 
@@ -85,7 +85,7 @@ class DMPNNEncoder(nn.Module):
 
         # Split the previous tensor into chunks so that each chunk corresponds to one bond, containing
         # all of the rows needed for the sum (i.e. the incoming bond vectors).
-        chunked_incoming_bonds = torch.split(all_incoming_bonds, a2b.shape[1])
+        chunked_incoming_bonds = torch.split(all_incoming_bonds, max_num_bonds)
 
         # Sum up each chunks and stack them back together.
         summed_chunks = torch.stack([torch.sum(chunk, dim=0) for chunk in chunked_incoming_bonds])
@@ -124,7 +124,7 @@ class DMPNNEncoder(nn.Module):
         # Message passing phase.
         for _ in range(self.message_passing_depth):
             # Compute the next message for each edge.
-            m_t = self.compute_next_bond_message(h_t, a2b, bond_incoming_bond_map, b2rev)
+            m_t = self.compute_next_bond_message(h_t, a2b.shape[1], bond_incoming_bond_map, b2rev)
 
             # Compute the next hidden state for each edge.
             h_t = self.relu(h_0 + self.W_m(m_t))
@@ -133,8 +133,8 @@ class DMPNNEncoder(nn.Module):
             h_t = self.dropout_layer(h_t)
 
         # Get atom-wise representation of messages.
-        node_2_edges = torch.split(h_t, batch_molecules.num_edges)
-        m_v = torch.stack([torch.sum(tensor, 0) for tensor in node_2_edges])
+        atom_chunks = torch.split(h_t, batch_molecules.num_bonds)
+        m_v = torch.stack([torch.sum(atom_chunk, 0) for atom_chunk in atom_chunks])
 
         # Get the atom-wise representation of hidden states by concating node features to node messages.
         node_feat_message = torch.cat((batch_molecules.x, m_v), dim=1)
@@ -142,7 +142,9 @@ class DMPNNEncoder(nn.Module):
         h_v = self.dropout_layer(h_v)
 
         # Readout phase, which creates the molecule representation from the atom representations.
-        h = torch.sum(h_v, dim=0)
+        unique_molecule_indices = torch.unique(batch_molecules.batch)
+        molecule_chunks = [h_v[batch_molecules.batch == i] for i in unique_molecule_indices]
+        h = torch.stack([torch.sum(molecule_chunk, 0) for molecule_chunk in molecule_chunks])
 
         # Concatenate molecular representation with external features and output.
         final_representation = torch.cat((h, batch_molecules.features), dim=1)

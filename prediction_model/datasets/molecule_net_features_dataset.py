@@ -170,6 +170,7 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
         scaler.fit(all_features)
 
         for d in data_list:
-            d.features = torch.tensor(scaler.transform(d.features.reshape(1, -1)[0]), dtype=torch.long)
+            d.features = (torch.tensor(scaler.transform(d.features.reshape(1, -1)[0]), 
+                dtype=torch.long).unsqueeze(0))
 
         torch.save(self.collate(data_list), self.processed_paths[0])

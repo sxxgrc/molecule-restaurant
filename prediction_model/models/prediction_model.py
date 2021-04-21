@@ -1,4 +1,4 @@
-import numpy
+import numpy, torch
 
 from torch import nn
 from torch.optim import Adam
@@ -88,6 +88,7 @@ def train_prediction_model(model, data_loader, criterion, num_epochs):
     
     # Train.
     model.train()
+    torch.set_grad_enabled(True)
 
     loss_sum = 0
     for data in data_loader:
@@ -103,12 +104,13 @@ def train_prediction_model(model, data_loader, criterion, num_epochs):
 
 
 """
-Tests the prediction model on a given data loader.
+Helper method which gets prediction results for a given model and data loader.
 """
-def test_prediction_model(model, data_loader):
+def get_predictions(model, data_loader):
     model.eval()
+    torch.set_grad_enabled(False)
 
-    # Test.
+    # Get predictions.
     y_pred = []
     y_pred_labels = []
     y_true = []
@@ -117,6 +119,15 @@ def test_prediction_model(model, data_loader):
         y_pred += y_hat.tolist()
         y_pred_labels += numpy.round(y_hat).tolist()
         y_true += data.y.numpy().tolist()
+    
+    return y_pred, y_pred_labels, y_true
+
+"""
+Tests the prediction model on a given data loader.
+"""
+def test_prediction_model(model, data_loader):
+    # Get predictions.
+    y_pred, y_pred_labels, y_true = get_predictions(model, data_loader)
 
     # Compute metrics.
     f1 = f1_score(y_true, y_pred_labels)
