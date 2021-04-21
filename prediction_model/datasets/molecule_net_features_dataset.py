@@ -149,12 +149,9 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
             # Generate feature vector for molecule.
             features = morgan_binary_features_generator(mol)
 
-            # Get number of edges for molecules.
-            num_bonds = [len(mol.GetBonds())]
-
             # Create data item for this molecule.
             data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y,
-                        smiles=smiles, features=features, num_bonds=num_bonds)
+                        smiles=smiles, features=features)
 
             if self.pre_filter is not None and not self.pre_filter(data):
                 continue

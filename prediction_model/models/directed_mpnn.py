@@ -23,8 +23,11 @@ class DMPNNEncoder(nn.Module):
         # Model arguments.
         self.message_passing_depth = args.message_passing_depth
 
+        # Cached zero vector to use for atoms without bonds.
+        self.cached_zero_vector = nn.Parameter(torch.zeros(args.hidden_size), requires_grad=False)
+
         # Dropout layer.
-        self.dropout_layer = nn.Dropout(args.encoder_dropout_prob)
+        self.dropout_layer = nn.Dropout(args.dropout_prob)
 
         # Activation function for the linear networks in the model.
         self.relu = nn.ReLU()
@@ -102,7 +105,7 @@ class DMPNNEncoder(nn.Module):
     def forward(self, batch_molecules):
         # Concatenate the edge feature matrix with the node feature matrix (edge vw concats with node v).
         expanded_x = torch.index_select(batch_molecules.x, 0, batch_molecules.edge_index[0])
-        edge_node_feat_mat = torch.cat((batch_molecules.edge_attr, expanded_x), dim=1)
+        edge_node_feat_mat = torch.cat((batch_molecules.edge_attr, expanded_x), dim=1).float()
 
         # Generate h_0 for each edge.
         h_0 = self.relu(self.W_i(edge_node_feat_mat))
@@ -132,9 +135,12 @@ class DMPNNEncoder(nn.Module):
             # Add dropout layer to not overtrain.
             h_t = self.dropout_layer(h_t)
 
-        # Get atom-wise representation of messages.
-        atom_chunks = torch.split(h_t, batch_molecules.num_bonds)
-        m_v = torch.stack([torch.sum(atom_chunk, 0) for atom_chunk in atom_chunks])
+        # Get atom-wise representation of messages. Some atoms have 0 bonds so we deal with that as well.
+        unique_atom_indices = [i for i in range(batch_molecules.x.shape[0])]
+        atom_chunks = [h_t[batch_molecules.edge_index[0] == i] for i in unique_atom_indices]
+        summed_atom_chunks = [torch.sum(atom_chunk, 0) if atom_chunk.numel() else 
+                              self.cached_zero_vector for atom_chunk in atom_chunks]
+        m_v = torch.stack(summed_atom_chunks)
 
         # Get the atom-wise representation of hidden states by concating node features to node messages.
         node_feat_message = torch.cat((batch_molecules.x, m_v), dim=1)

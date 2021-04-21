@@ -7,7 +7,7 @@ class ModelArgs():
     Initializes a ModelArgs object.
 
     Parameters:
-        - encoder_dropout_prob : The probability to use for dropout layers in the MPNN model.
+        - dropout_prob : The probability to use for dropout layers in the MPNN model.
         - message_passing_depth : The amount of message passing to do in the MPNN model.
         - hidden_size : The size of the hidden vectors being created in the MPNN model.
         - num_ffn_layers : The number of feedforward neural networks to use in the primary prediction model.

@@ -5,8 +5,13 @@ from pathlib import Path
 from os import path
 
 from models.arguments import ModelArgs
-from models import PredictionModel
-from prediction_model import train_hiv_model, test_hiv_model
+from models import (
+    PredictionModel, 
+    train_prediction_model, 
+    test_prediction_model, 
+    get_predictions,
+    train_ensemble,
+    test_ensemble)
 
 from hyperopt import hp, fmin, tpe
 
@@ -34,9 +39,22 @@ SAVE_PATH = (str(Path().absolute()) +
 """
 Runs hyperparameter optimization on the ensembled PredictionModel.
 This will optimize all of the parameters present in the ModelArgs class.
+
+Parameters:
+    - ensemble_size : The amount of models to use in the ensemble.
+    - atom_dim : The dimension of the atom features in the dataset.
+    - bond_dim : The dimension of the bond features in the dataset.
+    - features_dim : The dimension of the molecule features in the dataset.
+    - torch_device : The device being used for PyTorch.
+    - train_loader : Data loader containing the train dataset.
+    - test_loader : Data loader containing the test dataset.
+    - num_optimization_iters : The amount of iterations to optimize the hyperparameters for.
+    - num_epochs : The number of epochs to train each model for.
 """
 def optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, torch_device, 
-                             train_loader, test_loader, num_optimization_iters):
+                             train_loader, test_loader, num_optimization_iters, num_epochs):
+    print("Optimizing hyperparameters...")
+    
     # Initialize model arguments.
     model_args = ModelArgs(dropout_prob=0.0, message_passing_depth=3, hidden_size=300,
         num_ffn_layers=2, ffn_hidden_size=300, ffn_dropout_prob=0.0)
@@ -57,8 +75,9 @@ def optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, to
         # Create, train, and test the models.
         models = [PredictionModel(hyper_args, atom_dim, bond_dim, features_dim, torch_device)
                  for _ in range(ensemble_size)]
-        train_hiv_model(models, train_loader)
-        f1, roc_auc = test_hiv_model(models, test_loader)
+        train_ensemble(models, num_epochs, train_loader, test_loader, train_prediction_model, 
+                       test_prediction_model)
+        f1, roc_auc = test_ensemble(models, test_loader, get_predictions)
 
         # Record results.
         results.append({"f1": f1, "roc_auc": roc_auc, "hyperparams": hyperparams})
@@ -83,11 +102,11 @@ def optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, to
 Gets the optimized hyperparameters for the full ensembled prediction model.
 """
 def get_optimized_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, torch_device, 
-                             train_loader, test_loader, num_optimization_iters):
+                             train_loader, test_loader, num_optimization_iters, num_epochs):
     # Check if parameters are in file, creating them if not.
     if not path.exists(SAVE_PATH) or not path.getsize(SAVE_PATH) > 0:
         optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, torch_device,
-                                 train_loader, test_loader, num_optimization_iters)
+                                 train_loader, test_loader, num_optimization_iters, num_epochs)
     
     # Load the parameters from the JSON file.
     with open(SAVE_PATH, "r") as json_file:
