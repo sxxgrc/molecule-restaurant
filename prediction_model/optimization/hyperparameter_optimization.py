@@ -4,14 +4,15 @@ from pathlib import Path
 
 from os import path
 
-from models.arguments import ModelArgs
-from models import (
+from prediction_model.models.arguments import ModelArgs
+from prediction_model.models import (
     PredictionModel, 
     train_prediction_model, 
     test_prediction_model, 
     get_predictions,
     train_ensemble,
-    test_ensemble)
+    test_ensemble
+)
 
 from hyperopt import hp, fmin, tpe
 

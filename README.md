@@ -2,6 +2,8 @@
 
 requirements:
 anaconda
-make env with conda with requirements.txt
+pytorch
 
-currently uses pytorch for CPU so CUDA/opencl would need to be installed manually
+conda create -n molecule-restaurant
+conda activate molecule-restaurant
+run ./setup_molecule_restaurant.sh

@@ -1,4 +1,4 @@
-import torch, re, os, numpy
+import torch, re, os
 
 from torch_geometric.datasets import MoleculeNet
 from torch_geometric.data import Data, download_url, extract_gz

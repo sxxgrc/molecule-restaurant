@@ -9,10 +9,10 @@ from pathlib import Path
 
 from os import path
 
-from datasets import MoleculeNetFeaturesDataset
-from splitters import ScaffoldSplitter
-from optimization import get_optimized_hyperparameters
-from models import (
+from prediction_model.datasets import MoleculeNetFeaturesDataset
+from prediction_model.splitters import ScaffoldSplitter
+from prediction_model.optimization import get_optimized_hyperparameters
+from prediction_model.models import (
     HIVClassifier,
     PredictionModel, 
     train_prediction_model, 
@@ -171,5 +171,3 @@ def get_hiv_classifier(num_train_epochs, ensemble_size, torch_device, num_opt_it
 
     # Create HIV classifier model object and return.
     return HIVClassifier(models)
-
-get_hiv_classifier(30, 1, torch.device("cpu"), 20)
