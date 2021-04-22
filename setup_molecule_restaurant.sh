@@ -36,4 +36,6 @@ pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-"${torch_ve
 pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-"${torch_version}"+"${cuda_version}".html
 pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-"${torch_version}"+"${cuda_version}".html
 pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-"${torch_version}"+"${cuda_version}".html
-pip install torch-geometric 
+pip install torch-geometric
+echo
+echo "Done!"

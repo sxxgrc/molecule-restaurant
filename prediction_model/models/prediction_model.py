@@ -1,11 +1,8 @@
 import numpy, torch
 
 from torch import nn
-from torch.optim import Adam
 
 from .directed_mpnn import DMPNNEncoder
-
-from chemprop.nn_utils import NoamLR
 
 from sklearn.metrics import f1_score, roc_auc_score
 
@@ -29,28 +26,29 @@ class PredictionModel(nn.Module):
         super(PredictionModel, self).__init__()
 
         # Encoder model, which will encode the input molecule.
-        self.encoder = DMPNNEncoder(args, atom_dim, bond_dim).to(torch_device)
+        self.encoder = DMPNNEncoder(args, atom_dim, bond_dim, torch_device).to(torch_device)
 
         # Activation function for the feed-forward neural networks which will compute prediction.
-        self.sigmoid = nn.Sigmoid()
+        self.sigmoid = nn.Sigmoid().to(torch_device)
 
         # Dropout layer to use for feed-forward neural networks.
-        dropout = nn.Dropout(args.ffn_dropout_prob)
+        dropout = nn.Dropout(args.ffn_dropout_prob).to(torch_device)
 
         # The layers of feed-forward neural networks which will compute the property 
         # prediction from the embedding.
         if (args.num_ffn_layers == 1):
-            ffn = [dropout, nn.Linear(args.hidden_size + features_dim, 1)]
+            ffn = [dropout, nn.Linear(args.hidden_size + features_dim, 1).to(torch_device)]
         else:
             # First layer.
-            ffn = [dropout, nn.Linear(args.hidden_size + features_dim, args.ffn_hidden_size)]
+            ffn = [dropout, nn.Linear(args.hidden_size + features_dim, args.ffn_hidden_size).to(torch_device)]
 
             # Middle layers.
             for _ in range(args.num_ffn_layers - 2):
-                ffn.extend([self.sigmoid, dropout, nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size)])
+                ffn.extend([self.sigmoid, dropout, 
+                    nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size).to(torch_device)])
             
             # Final layer.
-            ffn.extend([self.sigmoid, dropout, nn.Linear(args.ffn_hidden_size, 1)])
+            ffn.extend([self.sigmoid, dropout, nn.Linear(args.ffn_hidden_size, 1).to(torch_device)])
         
         # Create final FFN model.
         self.ffn = nn.Sequential(*ffn).to(torch_device)
@@ -64,11 +62,21 @@ class PredictionModel(nn.Module):
 
     """
     Predicts whether a given molecule has a specific property or not.
-    """
-    def forward(self, batch_molecules):
-        # Compute prediction.
-        output = self.ffn(self.encoder(batch_molecules))
 
+    Parameters:
+        - atom_features : Tensor mapping each atom of each molecule to its features.
+        - bond_features : Tensor mapping each bond (in both directions) of each molecule to its features.
+        - bond_index : Tensor containing the atoms that make up each bond (one row for origin and one for target).
+        - molecule_features : Tensor mapping each molecule to its features.
+        - atom_to_molecule : Tensor mapping each atom to its molecule.
+    """
+    def forward(self, atom_features, bond_features, bond_index, molecule_features, atom_to_molecule):
+        # Compute prediction.
+        print("Getting encoder output.")
+        output = self.encoder(atom_features, bond_features, bond_index, molecule_features, atom_to_molecule)
+        print("Getting FFN output.")
+        output = self.ffn(output)
+            
         # Only apply sigmoid to output when not training, as we will use BCEWithLogitsLoss
         # for training which will apply a sigmoid to the output.
         if not self.training:
@@ -76,37 +84,79 @@ class PredictionModel(nn.Module):
         
         return output
 
+"""
+Helper method for getting model arguments from batch. 
+Sends all of the data to the desired torch device.
+
+Parameters:
+    - batch : The batch of data to separate.
+    - torch_device : The device to store the data in.
+
+Returns:
+    - atom_features : Tensor mapping each atom of each molecule to its features.
+    - bond_features : Tensor mapping each bond (in both directions) of each molecule to its features.
+    - bond_index : Tensor containing the atoms that make up each bond (one row for origin and one for target).
+    - molecule_features : Tensor mapping each molecule to its features.
+    - atom_to_molecule : Tensor mapping each atom to its molecule.
+    - true_y : Tensor containing the actual label for each molecule.
+"""
+def get_model_args_from_batch(batch, torch_device):
+    atom_features = batch.x.to(torch_device)
+    bond_features = batch.edge_attr.to(torch_device)
+    bond_index = batch.edge_index.to(torch_device)
+    molecule_features = batch.features.to(torch_device)
+    atom_to_molecule = batch.batch.to(torch_device)
+    true_y = batch.y.to(torch_device)
+
+    return atom_features, bond_features, bond_index, molecule_features, atom_to_molecule, true_y
 
 """
 Trains the prediction model for a given data loader.
 """
-def train_prediction_model(model, data_loader, criterion, num_epochs):
-    # Get optimizer and learning rate scheduler.
-    optimizer = Adam([{"params": model.parameters(), "lr": 1e-4, "weight_decay": 0}])
-    scheduler = NoamLR(optimizer=optimizer, warmup_epochs=[2.0], total_epochs=[num_epochs],
-        steps_per_epoch=len(data_loader), init_lr=[1e-4], max_lr=[1e-3], final_lr=[1e-4])
-    
+def train_prediction_model(model, data_loader, criterion, torch_device, optimizer, scheduler, scaler):
     # Train.
     model.train()
     torch.set_grad_enabled(True)
 
     loss_sum = 0
-    for data in data_loader:
-        optimizer.zero_grad()
-        y_hat = model(data)
-        loss = criterion(y_hat, data.y)
-        loss_sum += loss.item()
-        loss.backward()
-        optimizer.step()
+    for idx, data in enumerate(data_loader):
+        print("Training idx : " + str(idx) + " of " + str(len(data_loader)))
+
+        # Get separated data.
+        print("Separating data.")
+        atom_features, bond_features, bond_index, molecule_features, atom_to_molecule, true_y = \
+            get_model_args_from_batch(data, torch_device)
+
+        # Set gradient to zero for iteration.
+        print("Zeroing optimizer gradient.")
+        optimizer.zero_grad(set_to_none=True)
+
+        # Get output and loss.
+        print("Getting output from model.")
+        with torch.cuda.amp.autocast():
+            y_hat = model(atom_features, bond_features, bond_index, 
+                molecule_features, atom_to_molecule)
+            loss = criterion(y_hat, true_y)
+
+        # Perform back propagation and optimization.
+        print("Performing back propagation and optimization.")
+        scaler.scale(loss).backward()
+        loss_sum += loss.detach().item() # Get loss item after back propagation.
+        scaler.step(optimizer)
+        scaler.update()
         scheduler.step()
+
+        # Print information.
+        print("Current loss for idx : " + str(idx) + " of " + str(len(data_loader)) + 
+            " = " + str(loss_sum / (idx + 1)))
     
-    print("Current prediction model loss: " + str(loss_sum / len(data_loader)))
+    print("Post-training prediction model loss: " + str(loss_sum / len(data_loader)))
 
 
 """
 Helper method which gets prediction results for a given model and data loader.
 """
-def get_predictions(model, data_loader):
+def get_predictions(model, data_loader, torch_device):
     model.eval()
     torch.set_grad_enabled(False)
 
@@ -115,19 +165,25 @@ def get_predictions(model, data_loader):
     y_pred_labels = []
     y_true = []
     for data in data_loader:
-        y_hat = model(data).numpy()
+        # Get separated data.
+        atom_features, bond_features, bond_index, molecule_features, atom_to_molecule, true_y = \
+            get_model_args_from_batch(data, torch_device)
+        
+        # Get predictions and true values.
+        y_hat = model(atom_features, bond_features, bond_index, molecule_features, 
+            atom_to_molecule).detach().numpy()
         y_pred += y_hat.tolist()
         y_pred_labels += numpy.round(y_hat).tolist()
-        y_true += data.y.numpy().tolist()
+        y_true += true_y.detach().numpy().tolist()
     
     return y_pred, y_pred_labels, y_true
 
 """
 Tests the prediction model on a given data loader.
 """
-def test_prediction_model(model, data_loader):
+def test_prediction_model(model, data_loader, torch_device):
     # Get predictions.
-    y_pred, y_pred_labels, y_true = get_predictions(model, data_loader)
+    y_pred, y_pred_labels, y_true = get_predictions(model, data_loader, torch_device)
 
     # Compute metrics.
     f1 = f1_score(y_true, y_pred_labels)

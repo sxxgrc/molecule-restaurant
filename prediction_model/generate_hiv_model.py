@@ -31,7 +31,7 @@ Data preparation for the HIV dataset.
 
 Produces a train and test data loader, where the data split by molecular scaffold similarity.
 """
-def prepare_train_test_data(frac_train=0.8, frac_test=0.2):
+def prepare_train_test_data(frac_train=0.8, frac_test=0.2, batch_size=32):
     # Data path to store the dataset to train on.
     data_path = str(Path().absolute()) + "/prediction_model/data/torch-geometric"
 
@@ -41,7 +41,7 @@ def prepare_train_test_data(frac_train=0.8, frac_test=0.2):
     # Split the dataset into train and test datasets and create data loaders for them.
     if (frac_train == 1.0):
         # No reason to split.
-        train_loader = DataLoader(dataset, batch_size=32, shuffle=True)
+        train_loader = DataLoader(dataset, batch_size=batch_size)
         test_loader = None
     else:
         print("Splitting the data...")
@@ -49,8 +49,9 @@ def prepare_train_test_data(frac_train=0.8, frac_test=0.2):
         train_dataset, test_dataset = scaffold_splitter.split(frac_train, frac_test)
         print("Finished splitting.")
 
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-        test_loader = DataLoader(test_dataset, batch_size=32)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, 
+            num_workers=4, pin_memory=True)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, num_workers=4, pin_memory=True)
 
     return train_loader, test_loader
 
@@ -78,8 +79,9 @@ def generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim,
                                                 test_loader, num_opt_iters, num_epochs)
     
     # Generate the models.
-    models = [PredictionModel(model_args, atom_dim, bond_dim, features_dim, torch_device)
-             for _ in range(ensemble_size)]
+    models = [
+        PredictionModel(model_args, atom_dim, bond_dim, features_dim, torch_device).to(torch_device)
+        for _ in range(ensemble_size)]
     
     return models
 
@@ -115,12 +117,12 @@ def get_model_state_dict_path(model_idx):
 """
 Main method for generating the fully trained HIV classifier.
 """
-def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_iters):
+def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_iters, batch_size):
     print()
     print("Generating a new HIV replication inhibition classifier. Mind the noise!")
 
     # Prepare the train and test data.
-    train_loader, test_loader = prepare_train_test_data()
+    train_loader, test_loader = prepare_train_test_data(batch_size=batch_size)
 
     # Generate the models.
     print("Initializing the HIV models...")
@@ -132,10 +134,10 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
     # Train the ensembled models.
     print("Training the ensemble...")
     train_ensemble(models, num_train_epochs, train_loader, test_loader, train_prediction_model,
-                   test_prediction_model)
+                   test_prediction_model, torch_device)
 
     # Test the ensembled model.
-    f1, roc_auc = test_ensemble(models, test_loader, get_predictions)
+    f1, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device)
     print("Results of final ensembled model: F1=" + str(f1) + ", ROC AUC=" + str(roc_auc))
 
     # Save each of the models to the save path.
@@ -151,15 +153,16 @@ Parameters:
     - ensemble_size : The amount of models to use in the ensemble for the final model.
     - torch_device : The PyTorch device used for the models.
     - num_opt_iters : The amount of iterations to optimize the hyperparameters for.
+    - bath_size : The size of the batches to use for the dataset.
 """
-def get_hiv_classifier(num_train_epochs, ensemble_size, torch_device, num_opt_iters):
+def get_hiv_classifier(num_train_epochs, ensemble_size, torch_device, num_opt_iters, batch_size):
     # Check if all of the models for ensemble exist, if not create all of them.
     for model_idx in range(ensemble_size):
         model_path = get_model_state_dict_path(model_idx)
         if not path.exists(model_path) or not path.getsize(model_path) > 0:
-            generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_iters)
+            generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_iters, batch_size)
             break
-    
+
     # Initialize models. Everything should exist already so don't need data loaders.
     atom_dim, bond_dim, features_dim = get_dimensions(None)
     models = generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, 

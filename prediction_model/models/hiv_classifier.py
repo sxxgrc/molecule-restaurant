@@ -28,7 +28,7 @@ class HIVClassifier(nn.Module):
         # Get predictions for each model.
         for model in self.models:
             model.eval()
-            y_pred = model(molecules).numpy()
+            y_pred = model(molecules).detach().numpy()
 
             if predictions == None:
                 predictions = numpy.array(y_pred)

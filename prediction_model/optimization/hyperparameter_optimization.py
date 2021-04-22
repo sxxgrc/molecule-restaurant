@@ -77,8 +77,8 @@ def optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, to
         models = [PredictionModel(hyper_args, atom_dim, bond_dim, features_dim, torch_device)
                  for _ in range(ensemble_size)]
         train_ensemble(models, num_epochs, train_loader, test_loader, train_prediction_model, 
-                       test_prediction_model)
-        f1, roc_auc = test_ensemble(models, test_loader, get_predictions)
+                       test_prediction_model, torch_device)
+        f1, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device)
 
         # Record results.
         results.append({"f1": f1, "roc_auc": roc_auc, "hyperparams": hyperparams})

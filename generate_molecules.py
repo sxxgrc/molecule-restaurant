@@ -17,6 +17,7 @@ else:
     dev = "cpu"
 
 device = torch.device(dev)
+print()
 print("Using PyTorch device : " + str(device))
 
-hiv_classifier = get_hiv_classifier(30, 1, device, 20)
+hiv_classifier = get_hiv_classifier(30, 1, device, 20, 128)
