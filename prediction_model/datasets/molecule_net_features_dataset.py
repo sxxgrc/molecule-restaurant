@@ -147,7 +147,7 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
                 edge_index, edge_attr = edge_index[:, perm], edge_attr[perm]
 
             # Generate feature vector for molecule.
-            features = morgan_binary_features_generator(mol)
+            features = torch.as_tensor(morgan_binary_features_generator(mol))
 
             # Create data item for this molecule.
             data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y,
@@ -160,14 +160,46 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
                 data = self.pre_transform(data)
 
             data_list.append(data)
-        
-        # Normalize the features in the data.
-        all_features = vstack([d.features for d in data_list])
-        scaler = StandardScaler(replace_nan_token=0)
-        scaler.fit(all_features)
 
+        # Get all data features for normalization.
+        all_molecule_features = []
+        all_atom_features = []
+        all_edge_features = []
         for d in data_list:
-            d.features = (torch.tensor(scaler.transform(d.features.reshape(1, -1)[0]), 
+            all_molecule_features.append(d.features)
+            all_atom_features += d.x
+            all_edge_features += d.edge_attr
+        
+        # Normalize the molecule features in the data.
+        molecule_features_scaler = StandardScaler(replace_nan_token=0)
+        molecule_features_scaler.fit(vstack(all_molecule_features))
+
+        # Normalize the atom features in the data.
+        atom_features_scaler = StandardScaler(replace_nan_token=0)
+        atom_features_scaler.fit(vstack(all_atom_features))
+
+        # Normalize the edge features in the data.
+        edge_features_scaler = StandardScaler(replace_nan_token=0)
+        edge_features_scaler.fit(vstack(all_edge_features))
+
+        # Add in new values for data features.
+        for d in data_list:
+            d.features = (torch.as_tensor(
+                molecule_features_scaler.transform(d.features.reshape(1, -1)[0]), 
                 dtype=torch.long).unsqueeze(0))
+            
+            xs = []
+            for x in d.x:
+                xs.append(torch.as_tensor(
+                    atom_features_scaler.transform(x.reshape(1, -1)[0]),
+                    dtype=torch.long))
+            d.x = torch.stack(xs)
+
+            edge_attrs = []
+            for edge_attr in d.edge_attr:
+                edge_attrs.append(torch.as_tensor(
+                    edge_features_scaler.transform(edge_attr.reshape(1, -1)[0]),
+                    dtype=torch.long))
+            d.edge_attr = torch.stack(edge_attrs)
 
         torch.save(self.collate(data_list), self.processed_paths[0])

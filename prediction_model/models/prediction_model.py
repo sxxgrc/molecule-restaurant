@@ -120,7 +120,6 @@ def train_prediction_model(model, data_loader, criterion, torch_device, optimize
     torch.set_grad_enabled(True)
 
     loss_sum = 0
-    print()
     for data in data_loader:
         # Get separated data.
         atom_features, bond_features, bond_index, molecule_features, atom_to_molecule, true_y = \
@@ -138,11 +137,13 @@ def train_prediction_model(model, data_loader, criterion, torch_device, optimize
         # Perform back propagation and optimization.
         scaler.scale(loss).backward()
         loss_sum += loss.detach().item() # Get loss item after back propagation.
-        scaler_result = scaler.step(optimizer)
+        scaler.step(optimizer)
+        original_scale = scaler.get_scale()
         scaler.update()
 
-        # When this is none, the scaler created NaN or inf gradients and optimizer step was skipped.
-        if scaler_result != None:
+        # Takes care of times when optimizer did not step because of NaN or inf
+        # issues from scaler.
+        if original_scale == scaler.get_scale():
             scheduler.step()
     
     print("Post-training prediction model loss: " + str(loss_sum / len(data_loader)))

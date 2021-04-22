@@ -63,7 +63,7 @@ class DMPNNEncoder(nn.Module):
         # Pad the mapping with zeros and convert to tensor.
         a2b = [numpy.pad(a2b[idx], (0, max_bonds - len(a2b[idx])), 'constant') 
             for idx in range(num_atoms)]
-        return torch.as_tensor(a2b, device=self.torch_device).int()
+        return torch.as_tensor(a2b, device=self.torch_device, dtype=torch.int)
     
     """
     Generates a mapping of each bond to the index of its reverse bond.
@@ -81,7 +81,7 @@ class DMPNNEncoder(nn.Module):
             for idx in range(edge_index.shape[1])]
 
         # Return as tensor.
-        return torch.as_tensor(bond_reverse_map, device=self.torch_device).int()
+        return torch.as_tensor(bond_reverse_map, device=self.torch_device, dtype=torch.int)
 
     """
     Computes the next bond message for the given last hidden state.
