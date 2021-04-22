@@ -33,9 +33,9 @@ def train_ensemble(models, num_epochs, train_loader, test_loader, train_func,
         best_roc_auc = 0
 
         # Get optimizer and learning rate scheduler.
-        optimizer = AdamW([{"params": model.parameters(), "lr": 2e-4, "weight_decay": 0}])
-        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=2e-4, epochs=num_epochs,
-            steps_per_epoch=len(train_loader), )
+        optimizer = AdamW([{"params": model.parameters(), "lr": 4e-4, "weight_decay": 0}])
+        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=4e-4, epochs=num_epochs,
+            steps_per_epoch=len(train_loader))
         # scheduler = NoamLR(optimizer=optimizer, warmup_epochs=[2.0], total_epochs=[num_epochs],
             # steps_per_epoch=len(train_loader), init_lr=[2e-4], max_lr=[2e-3], final_lr=[2e-4])
 
@@ -47,9 +47,8 @@ def train_ensemble(models, num_epochs, train_loader, test_loader, train_func,
 
         # Train.
         for epoch in range(num_epochs):
-            print("Epoch " + str(epoch) + " of " + str(num_epochs - 1))
             train_func(model, train_loader, loss_func, torch_device, optimizer, scheduler, scaler)
-            f1, roc_auc = test_func(model, test_loader)
+            f1, roc_auc = test_func(model, test_loader, torch_device)
             print("For model " + str(idx) + " epoch " + str(epoch) + 
                 " : F1=" + str(f1) + ", ROC AUC=" + str(roc_auc))
             

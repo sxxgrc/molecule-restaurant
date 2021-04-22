@@ -38,6 +38,9 @@ def prepare_train_test_data(frac_train=0.8, frac_test=0.2, batch_size=32):
     # Load the HIV dataset we will be using for this training.
     dataset = MoleculeNetFeaturesDataset(data_path, name="HIV")
 
+    # TODO: Testing
+    dataset = dataset[:640]
+
     # Split the dataset into train and test datasets and create data loaders for them.
     if (frac_train == 1.0):
         # No reason to split.
@@ -76,7 +79,7 @@ def generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim,
     # Get the optimized hyperparameters for the models.
     model_args = get_optimized_hyperparameters(ensemble_size, atom_dim, bond_dim,
                                                 features_dim, torch_device, train_loader,
-                                                test_loader, num_opt_iters, num_epochs)
+                                                test_loader, num_opt_iters, num_epochs // 2)
     
     # Generate the models.
     models = [

@@ -72,9 +72,7 @@ class PredictionModel(nn.Module):
     """
     def forward(self, atom_features, bond_features, bond_index, molecule_features, atom_to_molecule):
         # Compute prediction.
-        print("Getting encoder output.")
         output = self.encoder(atom_features, bond_features, bond_index, molecule_features, atom_to_molecule)
-        print("Getting FFN output.")
         output = self.ffn(output)
             
         # Only apply sigmoid to output when not training, as we will use BCEWithLogitsLoss
@@ -119,36 +117,31 @@ def train_prediction_model(model, data_loader, criterion, torch_device, optimize
     torch.set_grad_enabled(True)
 
     loss_sum = 0
-    for idx, data in enumerate(data_loader):
-        print("Training idx : " + str(idx) + " of " + str(len(data_loader)))
-
+    print()
+    for data in data_loader:
         # Get separated data.
-        print("Separating data.")
         atom_features, bond_features, bond_index, molecule_features, atom_to_molecule, true_y = \
             get_model_args_from_batch(data, torch_device)
 
         # Set gradient to zero for iteration.
-        print("Zeroing optimizer gradient.")
         optimizer.zero_grad(set_to_none=True)
 
         # Get output and loss.
-        print("Getting output from model.")
         with torch.cuda.amp.autocast():
             y_hat = model(atom_features, bond_features, bond_index, 
                 molecule_features, atom_to_molecule)
+            print(y_hat.detach().cpu().numpy())
             loss = criterion(y_hat, true_y)
 
         # Perform back propagation and optimization.
-        print("Performing back propagation and optimization.")
         scaler.scale(loss).backward()
         loss_sum += loss.detach().item() # Get loss item after back propagation.
-        scaler.step(optimizer)
+        scaler_result = scaler.step(optimizer)
         scaler.update()
-        scheduler.step()
 
-        # Print information.
-        print("Current loss for idx : " + str(idx) + " of " + str(len(data_loader)) + 
-            " = " + str(loss_sum / (idx + 1)))
+        # When this is none, the scaler created NaN or inf gradients and optimizer step was skipped.
+        if scaler_result != None:
+            scheduler.step()
     
     print("Post-training prediction model loss: " + str(loss_sum / len(data_loader)))
 
@@ -171,11 +164,15 @@ def get_predictions(model, data_loader, torch_device):
         
         # Get predictions and true values.
         y_hat = model(atom_features, bond_features, bond_index, molecule_features, 
-            atom_to_molecule).detach().numpy()
+            atom_to_molecule).detach().cpu().numpy()
         y_pred += y_hat.tolist()
         y_pred_labels += numpy.round(y_hat).tolist()
-        y_true += true_y.detach().numpy().tolist()
+        y_true += true_y.detach().cpu().numpy().tolist()
     
+    print(y_pred)
+    print(y_pred_labels)
+    print(y_true)
+    print()
     return y_pred, y_pred_labels, y_true
 
 """
