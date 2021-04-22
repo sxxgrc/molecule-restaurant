@@ -32,7 +32,7 @@ class DMPNNEncoder(nn.Module):
         self.dropout_layer = nn.Dropout(args.dropout_prob).to(torch_device)
 
         # Activation function for the linear networks in the model.
-        self.relu = nn.ReLU().to(torch_device)
+        self.relu = nn.LeakyReLU().to(torch_device)
 
         # Input linear model W_i used to calculate h0.
         self.W_i = nn.Linear(atom_dim + bond_dim, args.hidden_size).to(torch_device)

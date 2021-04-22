@@ -27,11 +27,11 @@ from torch_geometric.data import DataLoader
 SAVE_PATH = str(Path().absolute()) + "/prediction_model/trained_models/"
 
 """
-Data preparation for the HIV dataset.
-
-Produces a train and test data loader, where the data split by molecular scaffold similarity.
+Gets the data for training the HIV model.
+Also computes the loss positive weight to use, calculated as: 
+number of negative classes / number of positive classes.
 """
-def prepare_train_test_data(frac_train=0.8, frac_test=0.2, batch_size=32):
+def get_data():
     # Data path to store the dataset to train on.
     data_path = str(Path().absolute()) + "/prediction_model/data/torch-geometric"
 
@@ -39,8 +39,20 @@ def prepare_train_test_data(frac_train=0.8, frac_test=0.2, batch_size=32):
     dataset = MoleculeNetFeaturesDataset(data_path, name="HIV")
 
     # TODO: Testing
-    dataset = dataset[:640]
+    dataset = dataset[:60]
 
+    # Compute loss positive weight.
+    num_pos = sum([data.y for data in dataset]).detach().item()
+    num_neg = len(dataset) - num_pos
+
+    return dataset, num_neg / num_pos
+
+"""
+Data preparation for the HIV dataset.
+
+Produces a train and test data loader, where the data split by molecular scaffold similarity.
+"""
+def prepare_train_test_data(dataset, frac_train=0.8, frac_test=0.2, batch_size=32):
     # Split the dataset into train and test datasets and create data loaders for them.
     if (frac_train == 1.0):
         # No reason to split.
@@ -73,13 +85,17 @@ Parameters:
     - test_loader : Data loader containing the test dataset.
     - num_opt_iters : The amount of iterations to optimize the hyperparameters for.
     - num_epochs : The number of epochs to train each model for.
+    - loss_pos_weight : Amount to weigh the positive labels in loss function.
+    - pos_label : What to consider "positive" for F1 calculation.
 """
 def generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, torch_device,
-                        train_loader, test_loader, num_opt_iters, num_epochs):
+                        train_loader, test_loader, num_opt_iters, num_epochs, loss_pos_weight,
+                        pos_label):
     # Get the optimized hyperparameters for the models.
     model_args = get_optimized_hyperparameters(ensemble_size, atom_dim, bond_dim,
                                                 features_dim, torch_device, train_loader,
-                                                test_loader, num_opt_iters, num_epochs // 2)
+                                                test_loader, num_opt_iters, num_epochs // 2,
+                                                loss_pos_weight, pos_label)
     
     # Generate the models.
     models = [
@@ -125,22 +141,27 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
     print("Generating a new HIV replication inhibition classifier. Mind the noise!")
 
     # Prepare the train and test data.
-    train_loader, test_loader = prepare_train_test_data(batch_size=batch_size)
+    data, loss_pos_weight = get_data()
+    train_loader, test_loader = prepare_train_test_data(data, batch_size=batch_size)
+
+    # Convert loss pos weight to tensor.
+    loss_pos_weight = torch.tensor(loss_pos_weight, device=torch_device)
 
     # Generate the models.
     print("Initializing the HIV models...")
     atom_dim, bond_dim, features_dim = get_dimensions(train_loader)
     models = generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, torch_device, 
-                                 train_loader, test_loader, num_opt_iters, num_train_epochs)
+                                 train_loader, test_loader, num_opt_iters, num_train_epochs, 
+                                 loss_pos_weight, 0)
     print("Done initializing the models.")
 
     # Train the ensembled models.
     print("Training the ensemble...")
     train_ensemble(models, num_train_epochs, train_loader, test_loader, train_prediction_model,
-                   test_prediction_model, torch_device)
+                   test_prediction_model, torch_device, loss_pos_weight, 0)
 
     # Test the ensembled model.
-    f1, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device)
+    f1, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device, 0)
     print("Results of final ensembled model: F1=" + str(f1) + ", ROC AUC=" + str(roc_auc))
 
     # Save each of the models to the save path.

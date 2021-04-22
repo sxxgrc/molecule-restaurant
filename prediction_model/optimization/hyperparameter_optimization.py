@@ -51,9 +51,12 @@ Parameters:
     - test_loader : Data loader containing the test dataset.
     - num_optimization_iters : The amount of iterations to optimize the hyperparameters for.
     - num_epochs : The number of epochs to train each model for.
+    - loss_pos_weight : Amount to weigh the positive labels in loss function.
+    - pos_label : What to consider "positive" for F1 calculation.
 """
 def optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, torch_device, 
-                             train_loader, test_loader, num_optimization_iters, num_epochs):
+                             train_loader, test_loader, num_optimization_iters, num_epochs,
+                             loss_pos_weight, pos_label):
     print("Optimizing hyperparameters...")
     
     # Initialize model arguments.
@@ -77,8 +80,9 @@ def optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, to
         models = [PredictionModel(hyper_args, atom_dim, bond_dim, features_dim, torch_device)
                  for _ in range(ensemble_size)]
         train_ensemble(models, num_epochs, train_loader, test_loader, train_prediction_model, 
-                       test_prediction_model, torch_device)
-        f1, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device)
+                       test_prediction_model, torch_device, loss_pos_weight, pos_label)
+        f1, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device, pos_label)
+        print("Results of ensembled model: F1=" + str(f1) + ", ROC AUC=" + str(roc_auc))
 
         # Record results.
         results.append({"f1": f1, "roc_auc": roc_auc, "hyperparams": hyperparams})
@@ -103,11 +107,13 @@ def optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, to
 Gets the optimized hyperparameters for the full ensembled prediction model.
 """
 def get_optimized_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, torch_device, 
-                             train_loader, test_loader, num_optimization_iters, num_epochs):
+                             train_loader, test_loader, num_optimization_iters, num_epochs, 
+                             loss_pos_weight, pos_label):
     # Check if parameters are in file, creating them if not.
     if not path.exists(SAVE_PATH) or not path.getsize(SAVE_PATH) > 0:
         optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, torch_device,
-                                 train_loader, test_loader, num_optimization_iters, num_epochs)
+                                 train_loader, test_loader, num_optimization_iters, num_epochs, 
+                                 loss_pos_weight, pos_label)
     
     # Load the parameters from the JSON file.
     with open(SAVE_PATH, "r") as json_file:

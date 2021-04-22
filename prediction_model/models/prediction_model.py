@@ -28,7 +28,10 @@ class PredictionModel(nn.Module):
         # Encoder model, which will encode the input molecule.
         self.encoder = DMPNNEncoder(args, atom_dim, bond_dim, torch_device).to(torch_device)
 
-        # Activation function for the feed-forward neural networks which will compute prediction.
+        # Activation function for the middle feed forward neural networks.
+        relu = nn.LeakyReLU().to(torch_device)
+
+        # Activation function for the final prediction computation.
         self.sigmoid = nn.Sigmoid().to(torch_device)
 
         # Dropout layer to use for feed-forward neural networks.
@@ -44,11 +47,11 @@ class PredictionModel(nn.Module):
 
             # Middle layers.
             for _ in range(args.num_ffn_layers - 2):
-                ffn.extend([self.sigmoid, dropout, 
+                ffn.extend([relu, dropout, 
                     nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size).to(torch_device)])
             
             # Final layer.
-            ffn.extend([self.sigmoid, dropout, nn.Linear(args.ffn_hidden_size, 1).to(torch_device)])
+            ffn.extend([relu, dropout, nn.Linear(args.ffn_hidden_size, 1).to(torch_device)])
         
         # Create final FFN model.
         self.ffn = nn.Sequential(*ffn).to(torch_device)
@@ -73,7 +76,7 @@ class PredictionModel(nn.Module):
     def forward(self, atom_features, bond_features, bond_index, molecule_features, atom_to_molecule):
         # Compute prediction.
         output = self.encoder(atom_features, bond_features, bond_index, molecule_features, atom_to_molecule)
-        output = self.ffn(output)
+        output = self.ffn(output).squeeze()
             
         # Only apply sigmoid to output when not training, as we will use BCEWithLogitsLoss
         # for training which will apply a sigmoid to the output.
@@ -104,7 +107,7 @@ def get_model_args_from_batch(batch, torch_device):
     bond_index = batch.edge_index.to(torch_device)
     molecule_features = batch.features.to(torch_device)
     atom_to_molecule = batch.batch.to(torch_device)
-    true_y = batch.y.to(torch_device)
+    true_y = batch.y.to(torch_device).squeeze()
 
     return atom_features, bond_features, bond_index, molecule_features, atom_to_molecule, true_y
 
@@ -130,7 +133,6 @@ def train_prediction_model(model, data_loader, criterion, torch_device, optimize
         with torch.cuda.amp.autocast():
             y_hat = model(atom_features, bond_features, bond_index, 
                 molecule_features, atom_to_molecule)
-            print(y_hat.detach().cpu().numpy())
             loss = criterion(y_hat, true_y)
 
         # Perform back propagation and optimization.
@@ -168,21 +170,16 @@ def get_predictions(model, data_loader, torch_device):
         y_pred += y_hat.tolist()
         y_pred_labels += numpy.round(y_hat).tolist()
         y_true += true_y.detach().cpu().numpy().tolist()
-    
-    print(y_pred)
-    print(y_pred_labels)
-    print(y_true)
-    print()
     return y_pred, y_pred_labels, y_true
 
 """
 Tests the prediction model on a given data loader.
 """
-def test_prediction_model(model, data_loader, torch_device):
+def test_prediction_model(model, data_loader, torch_device, pos_label):
     # Get predictions.
     y_pred, y_pred_labels, y_true = get_predictions(model, data_loader, torch_device)
 
     # Compute metrics.
-    f1 = f1_score(y_true, y_pred_labels)
+    f1 = f1_score(y_true, y_pred_labels, pos_label=pos_label)
     roc_auc = roc_auc_score(y_true, y_pred)
     return f1, roc_auc

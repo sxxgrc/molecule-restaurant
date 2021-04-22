@@ -1,15 +1,13 @@
 import numpy
 
 from torch import nn
-from torch.optim import AdamW
+from torch.optim import AdamW, SGD
 from torch.optim import lr_scheduler
 from torch.cuda.amp import GradScaler
 
 from copy import deepcopy
 
 from sklearn.metrics import f1_score, roc_auc_score
-
-from chemprop.nn_utils import NoamLR
 
 """
 Trains an ensemble of models on a given data loader.
@@ -22,35 +20,34 @@ Parameters:
     - train_func : The function to use to train the individual models.
     - test_func : The function to use to test the individual models.
     - torch_device : The device to store the data in.
+    - loss_pos_weight : Amount to weigh the positive labels in loss function.
+    - pos_label : What to consider "positive" for F1 calculation.
 """
 def train_ensemble(models, num_epochs, train_loader, test_loader, train_func, 
-    test_func, torch_device):
+    test_func, torch_device, loss_pos_weight, pos_label):
     # Iterate through models and train each one.
     for idx, model in enumerate(models):
         print()
         print("Training model " + str(idx) + " of " + str(len(models) - 1))
         best_model_state_dict = None
-        best_roc_auc = 0
+        best_roc_auc = -1
 
         # Get optimizer and learning rate scheduler.
-        optimizer = AdamW([{"params": model.parameters(), "lr": 4e-4, "weight_decay": 0}])
-        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=4e-4, epochs=num_epochs,
+        optimizer = AdamW([{"params": model.parameters(), "lr": 1e-4, "weight_decay": 0.01}])
+        # optimizer = SGD(model.parameters(), lr=0.001, momentum=0.9)
+        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=1e-4, epochs=num_epochs,
             steps_per_epoch=len(train_loader))
-        # scheduler = NoamLR(optimizer=optimizer, warmup_epochs=[2.0], total_epochs=[num_epochs],
-            # steps_per_epoch=len(train_loader), init_lr=[2e-4], max_lr=[2e-3], final_lr=[2e-4])
 
         # Scaler for mixed precision training.
         scaler = GradScaler()
 
         # Loss function to use.
-        loss_func = nn.BCEWithLogitsLoss()
+        loss_func = nn.BCEWithLogitsLoss(pos_weight=loss_pos_weight)
 
         # Train.
-        for epoch in range(num_epochs):
+        for _ in range(num_epochs):
             train_func(model, train_loader, loss_func, torch_device, optimizer, scheduler, scaler)
-            f1, roc_auc = test_func(model, test_loader, torch_device)
-            print("For model " + str(idx) + " epoch " + str(epoch) + 
-                " : F1=" + str(f1) + ", ROC AUC=" + str(roc_auc))
+            _, roc_auc = test_func(model, test_loader, torch_device, pos_label)
             
             # Save model state if it's the best we have seen so far.
             if roc_auc > best_roc_auc:
@@ -68,8 +65,9 @@ Parameters:
     - test_loader : The data loader containing the data to test.
     - prediction_func : The function to use to generate predictions for each model.
     - torch_device : The device to store the data in.
+    - pos_label : What to consider "positive" for F1 calculation.
 """
-def test_ensemble(models, test_loader, prediction_func, torch_device):
+def test_ensemble(models, test_loader, prediction_func, torch_device, pos_label):
     summed_preds = None
 
     # Iterate through each model and get predictions.
@@ -86,6 +84,6 @@ def test_ensemble(models, test_loader, prediction_func, torch_device):
     prediction_labels = numpy.round(predictions).tolist()
 
     # Get metrics.
-    f1 = f1_score(y_true, prediction_labels)
+    f1 = f1_score(y_true, prediction_labels, pos_label=pos_label)
     roc_auc = roc_auc_score(y_true, predictions.tolist())
     return f1, roc_auc
