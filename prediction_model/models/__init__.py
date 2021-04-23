@@ -1,5 +1,5 @@
 from .prediction_model import (
-    PredictionModel, 
+    create_prediction_model,
     train_prediction_model,
     test_prediction_model,
     get_predictions
@@ -13,7 +13,7 @@ from .directed_mpnn import DMPNNEncoder
 
 __all__ = [
     'HIVClassifier',
-    'PredictionModel',
+    'create_prediction_model',
     'train_prediction_model',
     'test_prediction_model',
     'get_predictions',

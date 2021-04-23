@@ -33,8 +33,8 @@ def train_ensemble(models, num_epochs, train_loader, test_loader, train_func,
         best_roc_auc = -1
 
         # Get optimizer and learning rate scheduler.
-        optimizer = AdamW(model.parameters(), lr=1e-5, weight_decay=1e-3)
-        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=1e-5, epochs=num_epochs,
+        optimizer = AdamW(model.parameters(), lr=1e-3, weight_decay=0)
+        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=1e-3, epochs=num_epochs,
             steps_per_epoch=len(train_loader))
 
         # Scaler for mixed precision training.

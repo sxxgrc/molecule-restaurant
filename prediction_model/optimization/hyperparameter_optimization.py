@@ -6,7 +6,7 @@ from os import path
 
 from prediction_model.models.arguments import ModelArgs
 from prediction_model.models import (
-    PredictionModel, 
+    create_prediction_model,
     train_prediction_model, 
     test_prediction_model, 
     get_predictions,
@@ -76,7 +76,7 @@ def optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device,
             setattr(hyper_args, key, value)
 
         # Create, train, and test the models.
-        model = [PredictionModel(hyper_args, atom_dim, bond_dim, features_dim, torch_device)]
+        model = [create_prediction_model(hyper_args, atom_dim, bond_dim, features_dim, torch_device)]
         train_ensemble(model, num_epochs, train_loader, test_loader, train_prediction_model, 
                        test_prediction_model, torch_device, loss_pos_weight, pos_label)
         f1, roc_auc = test_ensemble(model, test_loader, get_predictions, torch_device, pos_label)

@@ -15,7 +15,7 @@ from prediction_model.splitters import ScaffoldSplitter
 from prediction_model.optimization import get_optimized_hyperparameters
 from prediction_model.models import (
     HIVClassifier,
-    PredictionModel, 
+    create_prediction_model,
     train_prediction_model, 
     test_prediction_model, 
     get_predictions,
@@ -103,7 +103,7 @@ def generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim,
     
     # Generate the models.
     models = [
-        PredictionModel(model_args, atom_dim, bond_dim, features_dim, torch_device).to(torch_device)
+        create_prediction_model(model_args, atom_dim, bond_dim, features_dim, torch_device)
         for _ in range(ensemble_size)]
     
     return models

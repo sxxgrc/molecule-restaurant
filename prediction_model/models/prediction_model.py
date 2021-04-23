@@ -56,14 +56,6 @@ class PredictionModel(nn.Module):
         # Create final FFN model.
         self.ffn = nn.Sequential(*ffn).to(torch_device)
 
-        # Initialize the weights for the model.
-        for param in self.parameters():
-            print(param.names)
-            if param.dim() == 1:
-                nn.init.constant_(param, 0)
-            else:
-                nn.init.xavier_normal_(param)
-
     """
     Predicts whether a given molecule has a specific property or not.
 
@@ -79,19 +71,6 @@ class PredictionModel(nn.Module):
     """
     def forward(self, atom_features, bond_features, bond_index, molecule_features,
                 atom_incoming_bond_map, bond_reverse_map, num_bonds_per_atom, num_atoms_per_mol):
-
-        print("FFN parameters:")
-        for name, param in self.ffn.named_parameters():
-            print(name)
-            print(param.requires_grad)
-            print(param.grad)
-
-        print("Encoder parameters")
-        for name, param in self.encoder.named_parameters():
-            print(name)
-            print(param.requires_grad)
-            print(param.grad)
-
         # Compute prediction.
         output = self.encoder(atom_features, bond_features, bond_index, molecule_features, 
                               atom_incoming_bond_map, bond_reverse_map, num_bonds_per_atom,
@@ -104,6 +83,24 @@ class PredictionModel(nn.Module):
             output = self.sigmoid(output)
         
         return output
+
+"""
+Creates a PredictionModel and initializes its parameters.
+"""
+def create_prediction_model(model_args, atom_dim, bond_dim, features_dim, torch_device):
+    model = PredictionModel(model_args, atom_dim, bond_dim, features_dim, torch_device)
+
+    # Initialize the weights for the model.
+    for param in model.parameters():
+        if param.dim() == 1:
+            nn.init.constant_(param, 0)
+        else:
+            nn.init.xavier_normal_(param)
+    
+    # Send model to device.
+    model.to(torch_device)
+    
+    return model
 
 """
 Helper method for getting model arguments from batch. 
@@ -156,7 +153,8 @@ def train_prediction_model(model, data_loader, criterion, torch_device, optimize
 
         # Perform back propagation and optimization.
         scaler.scale(loss).backward()
-        nn.utils.clip_grad_value_(model.parameters(), clip_value=5.0)
+        nn.utils.clip_grad_value_(model.parameters(), clip_value=1.0)
+        print("LOSS: " + str(loss.detach().item()))
         loss_sum += loss.detach().item() # Get loss item after back propagation.
         scaler.step(optimizer)
         original_scale = scaler.get_scale()
@@ -166,6 +164,21 @@ def train_prediction_model(model, data_loader, criterion, torch_device, optimize
         # issues from scaler.
         if original_scale == scaler.get_scale():
             scheduler.step()
+        
+        if False:
+            print("FFN parameters:")
+            for name, param in model.ffn.named_parameters():
+                if param.requires_grad:
+                    print(name)
+                    print(param.data)
+                    print(param.grad)
+
+            print("Encoder parameters")
+            for name, param in model.encoder.named_parameters():
+                if param.requires_grad:
+                    print(name)
+                    print(param.data)
+                    print(param.grad)
     
     print("Post-training prediction model loss: " + str(loss_sum / len(data_loader)))
 
