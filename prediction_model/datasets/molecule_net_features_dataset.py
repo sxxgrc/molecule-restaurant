@@ -107,6 +107,8 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
                 continue
 
             xs = []
+            num_bonds_per_atom = []
+            degree = []
             for atom in mol.GetAtoms():
                 x = []
                 x.append(x_map['atomic_num'].index(atom.GetAtomicNum()))
@@ -121,6 +123,13 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
                 x.append(x_map['is_aromatic'].index(atom.GetIsAromatic()))
                 x.append(x_map['is_in_ring'].index(atom.IsInRing()))
                 xs.append(x)
+                degree.append(atom.GetDegree())
+                num_bonds_per_atom.append(len(atom.GetBonds()) / 2)
+            print()
+            print(sum(degree))
+            print(sum(num_bonds_per_atom))
+            print(len(mol.GetBonds()))
+            print()
 
             x = torch.tensor(xs, dtype=torch.long).view(-1, 9)
 

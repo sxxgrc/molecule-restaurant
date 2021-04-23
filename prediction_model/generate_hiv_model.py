@@ -10,6 +10,7 @@ from pathlib import Path
 from os import path
 
 from prediction_model.datasets import MoleculeNetFeaturesDataset
+from prediction_model.dataloaders import ExtendedDataLoader
 from prediction_model.splitters import ScaffoldSplitter
 from prediction_model.optimization import get_optimized_hyperparameters
 from prediction_model.models import (
@@ -65,7 +66,6 @@ def prepare_train_test_data(dataset, frac_train=0.8, frac_test=0.2, batch_size=3
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, 
             num_workers=4, pin_memory=True)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, num_workers=4, pin_memory=True)
-
     return train_loader, test_loader
 
 """

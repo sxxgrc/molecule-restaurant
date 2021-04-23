@@ -1,7 +1,5 @@
 import numpy, torch
 
-from threading import Thread
-
 from torch import nn
 
 from .directed_mpnn import DMPNNEncoder
@@ -98,13 +96,8 @@ Generates a mapping of each atom to the indices of the bonds coming into that at
 Parameters:
     - num_atoms : The total number of atoms in the input.
     - incoming_edge_points : List of the end indices for all edges in the input.
-    - results : Array to place value into.
-    - results_idx : Index for result.
 """
-def get_atom_incoming_bond_map(num_atoms, incoming_edge_points, results, results_idx):
-    # Convert edge tensor to numpy.
-    incoming_edge_points = incoming_edge_points.detach().cpu().numpy()
-
+def get_atom_incoming_bond_map(num_atoms, incoming_edge_points):
     # Initialize mapping.
     a2b = [[] for _ in range(num_atoms)]
 
@@ -116,7 +109,7 @@ def get_atom_incoming_bond_map(num_atoms, incoming_edge_points, results, results
         max_bonds = max(max_bonds, len(a2b[incoming_edge_points[edge_idx]]))
     
     # Pad the mapping with zeros and convert to tensor.
-    results[results_idx] = [numpy.pad(a2b[idx], (0, max_bonds - len(a2b[idx])), 'constant') 
+    return [numpy.pad(a2b[idx], (0, max_bonds - len(a2b[idx])), 'constant') 
         for idx in range(num_atoms)]
 
 """
@@ -124,14 +117,13 @@ Generates a mapping of each bond to the index of its reverse bond.
 That is, for the bond {0, 1}, this function will generate a tensor where the initial
 index for {0, 1} will contain the index of the bond {1, 0}.
 """
-def get_bond_reverse_map(edge_index, num_edges, results, results_idx):
+def get_bond_reverse_map(edge_index, num_edges):
     # Generate mapping of each edge to its index.
-    edge_index = edge_index.detach().cpu().numpy()
     edge_index_map = {(edge_index[0][idx], edge_index[1][idx]) : idx
         for idx in range(num_edges)}
 
     # Generate the bond reverse map.
-    results[results_idx] = [edge_index_map[(edge_index[1][idx], edge_index[0][idx])] 
+    return [edge_index_map[(edge_index[1][idx], edge_index[0][idx])] 
         for idx in range(num_edges)]
 
 """
@@ -142,11 +134,9 @@ the list is a boolean mask for the positions of the atom's bonds.
 Parameters:
     - num_atoms : The number of atoms in the current batch.
     - bond_to_atom_map : Mapping of each bond to the index of the atom it originates from.
-    - results : Array to place value into.
-    - results_idx : Index for result.
 """
-def get_atom_chunk_mask(num_atoms, bond_to_atom_map, results, results_idx):
-    results[results_idx] = [[bond_to_atom_map == i] for i in range(num_atoms)]
+def get_atom_chunk_mask(num_atoms, bond_to_atom_map):
+    return [[bond_to_atom_map == i] for i in range(num_atoms)]
 
 """
 Gets a mask for each molecule's atoms.
@@ -156,11 +146,9 @@ and the list is a boolean mask for the positions of the molecule's atoms.
 Parameters:
     - atom_to_molecule : Mapping of each atom to the index of its molecule.
     - num_molecules : The number of molecules in the batch.
-    - results : Array to place value into.
-    - results_idx : Index for result.
 """
-def get_molecule_chunk_mask(atom_to_molecule, num_molecules, results, results_idx):
-    results[results_idx] = [[atom_to_molecule == i] for i in range(num_molecules)]
+def get_molecule_chunk_mask(atom_to_molecule, num_molecules):
+    return [[atom_to_molecule == i] for i in range(num_molecules)]
 
 """
 Helper method for getting model arguments from batch. 
@@ -175,43 +163,34 @@ Returns:
     - bond_features : Tensor mapping each bond (in both directions) of each molecule to its features.
     - bond_index : Tensor containing atoms that make up each bond (one row for origin one for target).
     - molecule_features : Tensor mapping each molecule to its features.
-    - atom_incoming_bond_map : Tensor mapping each atom to the indices of its incoming bonds.
-    - bond_reverse_map : Tensor mapping each bond to the index of its reverse.
-    - atom_chunk_mask : List of masks which contain the indices of each atom's bonds.
-    - molecule_chunk_mask : List of masks which contain indices of each molecule's atoms.
     - true_y : Tensor containing the actual label for each molecule.
 """
 def get_model_args_from_batch(batch, torch_device):
     # Do CPU intensive computations first.
-    threads = [None] * 4
-    results = [None] * 4
-
-    threads[0] = Thread(target=get_atom_incoming_bond_map, args=(batch.x.shape[0], batch.edge_index[1],
-                                                                 results, 0))
-    threads[0].start()
-    threads[1] = Thread(target=get_bond_reverse_map, args=(batch.edge_index, batch.edge_index.shape[1],
-                                                           results, 1))
-    threads[1].start()
-    threads[2] = Thread(target=get_atom_chunk_mask, args=(batch.x.shape[0], batch.edge_index[0], results, 2))
-    threads[2].start()
-    threads[3] = Thread(target=get_molecule_chunk_mask, args=(batch.batch, batch.y.shape[0], results, 3))
-    threads[3].start()
-
-    # Collect threads.
-    for i in range(len(threads)):
-        threads[i].join()
+    print("1")
+    atom_incoming_bond_map = get_atom_incoming_bond_map(batch.x.shape[0], batch.edge_index[1]
+                                                            .detach().cpu().numpy())
+    print("2")
+    bond_reverse_map = get_bond_reverse_map(batch.edge_index.detach().cpu().numpy(),
+                                            batch.edge_index.shape[1])
+    print("3")
+    atom_chunk_mask = get_atom_chunk_mask(batch.x.shape[0], batch.edge_index[0])
+    print("4")
+    molecule_chunk_mask = get_molecule_chunk_mask(batch.batch, batch.y.shape[0])
+    print("5")
 
     # Send all to correct device.
     atom_features = batch.x.to(torch_device)
     bond_features = batch.edge_attr.to(torch_device)
     bond_index = batch.edge_index.to(torch_device)
     molecule_features = batch.features.to(torch_device)
+    atom_incoming_bond_map = torch.as_tensor(atom_incoming_bond_map, 
+                                             device=torch_device, dtype=torch.int)
+    bond_reverse_map = torch.as_tensor(bond_reverse_map, device=torch_device, dtype=torch.int)
     true_y = batch.y.to(torch_device).squeeze()
-    atom_incoming_bond_map = torch.as_tensor(results[0], device=torch_device, dtype=torch.int)
-    bond_reverse_map = torch.as_tensor(results[1], device=torch_device, dtype=torch.int)
 
     return atom_features, bond_features, bond_index, molecule_features, atom_incoming_bond_map, \
-           bond_reverse_map, results[2], results[3], true_y
+           bond_reverse_map, atom_chunk_mask, molecule_chunk_mask, true_y
 
 """
 Trains the prediction model for a given data loader.

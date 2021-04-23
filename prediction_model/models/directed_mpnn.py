@@ -92,16 +92,11 @@ class DMPNNEncoder(nn.Module):
         edge_node_feat_mat = torch.cat((bond_features, expanded_x), dim=1).float()
 
         # Generate h_0 for each edge.
-        h_0 = self.W_i(edge_node_feat_mat)
-        h_0 = self.relu(h_0)
-        h_0 = self.bn(h_0)
+        h_0 = self.bn(self.relu(self.W_i(edge_node_feat_mat)))
         h_t = h_0
-
-        # Get mapping of each bond to the index of the atom that originates the bond.
-        b2a = bond_index[0]
         
         # Expand the atom to incoming bond map for all of the bonds in the dataset.
-        bond_incoming_bond_map = torch.index_select(atom_incoming_bond_map, 0, b2a)
+        bond_incoming_bond_map = torch.index_select(atom_incoming_bond_map, 0, bond_index[0])
 
         # Message passing phase.
         for _ in range(self.message_passing_depth):
@@ -110,29 +105,31 @@ class DMPNNEncoder(nn.Module):
                                                  bond_incoming_bond_map, bond_reverse_map)
 
             # Compute the next hidden state for each edge.
-            h_t = h_0 + self.W_m(m_t)
-            h_t = self.relu(h_t)
-            h_t = self.bn(h_t)
+            h_t = self.bn(self.relu(h_0 + self.W_m(m_t)))
 
             # Add dropout layer to not overtrain.
             h_t = self.dropout_layer(h_t)
 
         # Get atom-wise representation of messages. Some atoms have 0 bonds so we deal with that as well.
+        print("6")
         atom_chunks = [h_t[mask] for mask in atom_chunk_mask]
+        print("7")
         summed_atom_chunks = [torch.sum(atom_chunk, 0) if atom_chunk.numel() else 
                               self.cached_zero_vector for atom_chunk in atom_chunks]
+        print("8")
         m_v = torch.stack(summed_atom_chunks)
 
         # Get the atom-wise representation of hidden states by concating node features to node messages.
         node_feat_message = torch.cat((atom_features, m_v), dim=1)
-        h_v = self.W_a(node_feat_message)
-        h_v = self.relu(h_v)
-        h_v = self.bn(h_v)
+        h_v = self.bn(self.relu(self.W_a(node_feat_message)))
         h_v = self.dropout_layer(h_v)
 
         # Readout phase, which creates the molecule representation from the atom representations.
+        print("9")
         molecule_chunks = [h_v[mask] for mask in molecule_chunk_mask]
+        print("10")
         h = torch.stack([torch.sum(molecule_chunk, 0) for molecule_chunk in molecule_chunks])
+        print("11")
 
         # Concatenate molecular representation with external features and output.
         final_representation = torch.cat((h, molecule_features), dim=1)
