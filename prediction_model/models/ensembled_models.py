@@ -33,8 +33,8 @@ def train_ensemble(models, num_epochs, train_loader, test_loader, train_func,
         best_roc_auc = -1
 
         # Get optimizer and learning rate scheduler.
-        optimizer = AdamW([{"params": model.parameters(), "lr": 1e-5, "weight_decay": 0.1}])
-        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=1e-5, epochs=num_epochs,
+        optimizer = AdamW([{"params": model.parameters(), "lr": 1e-4}])
+        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=1e-4, epochs=num_epochs,
             steps_per_epoch=len(train_loader))
 
         # Scaler for mixed precision training.
@@ -44,14 +44,15 @@ def train_ensemble(models, num_epochs, train_loader, test_loader, train_func,
         loss_func = nn.BCEWithLogitsLoss(pos_weight=loss_pos_weight)
 
         # Train.
-        for _ in range(num_epochs):
+        for epoch in range(num_epochs):
+            print(str(epoch) + " of " + str(num_epochs - 1))
             train_func(model, train_loader, loss_func, torch_device, optimizer, scheduler, scaler)
-            # _, roc_auc = test_func(model, test_loader, torch_device, pos_label)
+            _, roc_auc = test_func(model, test_loader, torch_device, pos_label)
             
-            # # Save model state if it's the best we have seen so far.
-            # if roc_auc > best_roc_auc:
-            #     best_roc_auc = roc_auc
-            #     best_model_state_dict = deepcopy(model.state_dict())
+            # Save model state if it's the best we have seen so far.
+            if roc_auc > best_roc_auc:
+                best_roc_auc = roc_auc
+                best_model_state_dict = deepcopy(model.state_dict())
         
         # Set model to its best version.
         model.load_state_dict(best_model_state_dict)

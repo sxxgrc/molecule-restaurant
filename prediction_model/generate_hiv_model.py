@@ -37,9 +37,7 @@ def get_data():
 
     # Load the HIV dataset we will be using for this training.
     dataset = MoleculeNetFeaturesDataset(data_path, name="HIV")
-
-    # TODO: Testing
-    dataset = dataset[:60]
+    dataset = dataset[:5120] # TODO
 
     # Compute loss positive weight.
     num_pos = sum([data.y for data in dataset]).detach().item()
@@ -92,10 +90,9 @@ def generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim,
                         train_loader, test_loader, num_opt_iters, num_epochs, loss_pos_weight,
                         pos_label):
     # Get the optimized hyperparameters for the models.
-    model_args = get_optimized_hyperparameters(ensemble_size, atom_dim, bond_dim,
-                                                features_dim, torch_device, train_loader,
-                                                test_loader, num_opt_iters, num_epochs // 2,
-                                                loss_pos_weight, pos_label)
+    model_args = get_optimized_hyperparameters(atom_dim, bond_dim, features_dim, torch_device, 
+                                                train_loader, test_loader, num_opt_iters, 
+                                                num_epochs // 2, loss_pos_weight, pos_label)
     
     # Generate the models.
     models = [

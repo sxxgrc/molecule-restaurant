@@ -42,7 +42,6 @@ Runs hyperparameter optimization on the ensembled PredictionModel.
 This will optimize all of the parameters present in the ModelArgs class.
 
 Parameters:
-    - ensemble_size : The amount of models to use in the ensemble.
     - atom_dim : The dimension of the atom features in the dataset.
     - bond_dim : The dimension of the bond features in the dataset.
     - features_dim : The dimension of the molecule features in the dataset.
@@ -54,7 +53,7 @@ Parameters:
     - loss_pos_weight : Amount to weigh the positive labels in loss function.
     - pos_label : What to consider "positive" for F1 calculation.
 """
-def optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, torch_device, 
+def optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device, 
                              train_loader, test_loader, num_optimization_iters, num_epochs,
                              loss_pos_weight, pos_label):
     print("Optimizing hyperparameters...")
@@ -75,14 +74,13 @@ def optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, to
 
         for key, value in hyperparams.items():
             setattr(hyper_args, key, value)
-        
+
         # Create, train, and test the models.
-        models = [PredictionModel(hyper_args, atom_dim, bond_dim, features_dim, torch_device)
-                 for _ in range(ensemble_size)]
-        train_ensemble(models, num_epochs, train_loader, test_loader, train_prediction_model, 
+        model = [PredictionModel(hyper_args, atom_dim, bond_dim, features_dim, torch_device)]
+        train_ensemble(model, num_epochs, train_loader, test_loader, train_prediction_model, 
                        test_prediction_model, torch_device, loss_pos_weight, pos_label)
-        f1, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device, pos_label)
-        print("Results of ensembled model: F1=" + str(f1) + ", ROC AUC=" + str(roc_auc))
+        f1, roc_auc = test_ensemble(model, test_loader, get_predictions, torch_device, pos_label)
+        print("Results of model: F1=" + str(f1) + ", ROC AUC=" + str(roc_auc))
 
         # Record results.
         results.append({"f1": f1, "roc_auc": roc_auc, "hyperparams": hyperparams})
@@ -106,12 +104,12 @@ def optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, to
 """
 Gets the optimized hyperparameters for the full ensembled prediction model.
 """
-def get_optimized_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, torch_device, 
+def get_optimized_hyperparameters(atom_dim, bond_dim, features_dim, torch_device, 
                              train_loader, test_loader, num_optimization_iters, num_epochs, 
                              loss_pos_weight, pos_label):
     # Check if parameters are in file, creating them if not.
     if not path.exists(SAVE_PATH) or not path.getsize(SAVE_PATH) > 0:
-        optimize_hyperparameters(ensemble_size, atom_dim, bond_dim, features_dim, torch_device,
+        optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device,
                                  train_loader, test_loader, num_optimization_iters, num_epochs, 
                                  loss_pos_weight, pos_label)
     
