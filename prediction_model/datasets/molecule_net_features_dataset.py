@@ -108,7 +108,6 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
 
             xs = []
             num_bonds_per_atom = []
-            degree = []
             for atom in mol.GetAtoms():
                 x = []
                 x.append(x_map['atomic_num'].index(atom.GetAtomicNum()))
@@ -123,15 +122,11 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
                 x.append(x_map['is_aromatic'].index(atom.GetIsAromatic()))
                 x.append(x_map['is_in_ring'].index(atom.IsInRing()))
                 xs.append(x)
-                degree.append(atom.GetDegree())
-                num_bonds_per_atom.append(len(atom.GetBonds()) / 2)
-            print()
-            print(sum(degree))
-            print(sum(num_bonds_per_atom))
-            print(len(mol.GetBonds()))
-            print()
+                num_bonds_per_atom.append(int(len(atom.GetBonds()) / 2))
 
             x = torch.tensor(xs, dtype=torch.long).view(-1, 9)
+            num_bonds_per_atom = torch.tensor(num_bonds_per_atom, dtype=torch.int())
+            num_atoms_per_mol = [len(mol.GetAtoms())]
 
             edge_indices, edge_attrs = [], []
             for bond in mol.GetBonds():
@@ -160,7 +155,8 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
 
             # Create data item for this molecule.
             data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y,
-                        smiles=smiles, features=features)
+                        smiles=smiles, features=features, num_bonds_per_atom=num_bonds_per_atom,
+                        num_atoms_per_mol=num_atoms_per_mol)
 
             if self.pre_filter is not None and not self.pre_filter(data):
                 continue

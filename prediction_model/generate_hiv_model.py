@@ -119,6 +119,9 @@ def get_dimensions(data_loader):
     
     # Compute the dimension values based off the dataset.
     data_view = next(iter(data_loader))
+    print(data_view)
+    print(data_view.num_bonds_per_atom)
+    print(data_view.num_atoms_per_mol)
     atom_dim = data_view.x.shape[1]
     bond_dim = data_view.edge_attr.shape[1]
     features_dim = data_view.features.shape[1]
