@@ -9,7 +9,7 @@ from pathlib import Path
 
 from os import path
 
-from prediction_model.datasets import MoleculeNetFeaturesDataset
+from prediction_model.datasets import MoleculeNetFeaturesDataset, normalize_features
 from prediction_model.dataloaders import ExtendedDataLoader
 from prediction_model.splitters import ScaffoldSplitter
 from prediction_model.optimization import get_optimized_hyperparameters
@@ -49,7 +49,8 @@ def get_data():
     # Compute dimensions.
     atom_dim = dataset[0].x.shape[1]
     bond_dim = dataset[0].edge_attr.shape[1]
-    features_dim = dataset[0].features.shape[1]
+    features_dim = dataset[0].features.shape[0]
+    print(features_dim)
 
     return dataset, num_neg / num_pos, atom_dim, bond_dim, features_dim
 
@@ -60,15 +61,24 @@ Produces a train and test data loader, where the data split by molecular scaffol
 """
 def prepare_train_test_data(dataset, frac_train=0.8, frac_test=0.2, batch_size=32):
     # Split the dataset into train and test datasets and create data loaders for them.
+    print(dataset.get_len())
     if (frac_train == 1.0):
         # No reason to split.
         train_loader = ExtendedDataLoader(dataset, batch_size=batch_size)
         test_loader = None
     else:
         print("Splitting the data...")
-        scaffold_splitter = ScaffoldSplitter(dataset)
-        train_dataset, test_dataset = scaffold_splitter.split(frac_train, frac_test)
+        scaffold_splitter = ScaffoldSplitter()
+        train_dataset, test_dataset = scaffold_splitter.split(dataset, frac_train, frac_test)
         print("Finished splitting.")
+        print(train_dataset.get_len())
+        print(test_dataset.get_len())
+
+        print("Normalizing the data...")
+        normalize_features(train_dataset)
+        normalize_features(test_dataset)
+        print("Finished normalizing.")
+        print(train_dataset[0].features.shape)
 
         train_loader = ExtendedDataLoader(train_dataset, batch_size=batch_size, shuffle=True, 
             num_workers=4, pin_memory=True)

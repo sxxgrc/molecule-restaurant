@@ -11,22 +11,21 @@ This follows the same process as the deepchem ScaffoldSplitter class found here:
 github.com/deepchem/deepchem/blob/master/deepchem/splits/splitters.py
 """
 class ScaffoldSplitter():
-    def __init__(self, dataset, scaffold_generator=MurckoScaffoldSmiles):
-        self.dataset = dataset
+    def __init__(self, scaffold_generator=MurckoScaffoldSmiles):
         self.scaffold_generator = scaffold_generator
     
     """
     Splits the dataset into train and test datasets according to the percentages
     provided.
     """
-    def split(self, frac_train, frac_test):
+    def split(self, dataset, frac_train, frac_test):
         assert_almost_equal(frac_train + frac_test, 1.)
 
         # Get the sorted scaffold sets.
-        scaffold_sets = self.generate_scaffolds()
+        scaffold_sets = self.generate_scaffolds(dataset)
 
         # Generate the split indices for each dataset.
-        train_cutoff = frac_train * len(self.dataset)
+        train_cutoff = frac_train * len(dataset)
         train_indices = []
         test_indices = []
 
@@ -37,7 +36,7 @@ class ScaffoldSplitter():
                 train_indices += scaffold_set
 
         # Return the split datasets.
-        return self.dataset[train_indices], self.dataset[test_indices]
+        return dataset[train_indices], dataset[test_indices]
     
     """
     Generates a list of lists containing the indices of each scaffold in the dataset.
@@ -45,12 +44,12 @@ class ScaffoldSplitter():
     that have those scaffolds, and split them up into separate lists (using the indices of the
     molecules). The scaffolds are then sorted from largest to smallest sets.
     """
-    def generate_scaffolds(self):
+    def generate_scaffolds(self, dataset):
         scaffolds = {}
 
         # Get all of the scaffolds for the molecules in the dataset and separate them.
-        for idx in range(len(self.dataset)):
-            smiles = self.dataset[idx].smiles
+        for idx in range(len(dataset)):
+            smiles = dataset[idx].smiles
             scaffold = self.generate_scaffold(smiles)
             if scaffold not in scaffolds:
                 scaffolds[scaffold] = [idx]
