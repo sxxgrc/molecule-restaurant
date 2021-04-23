@@ -29,22 +29,22 @@ class DMPNNEncoder(nn.Module):
         self.cached_zero_vector = nn.Parameter(torch.zeros(args.hidden_size), requires_grad=False)
 
         # Dropout layer.
-        self.dropout_layer = nn.Dropout(args.dropout_prob).to(torch_device)
+        self.dropout_layer = nn.Dropout(args.dropout_prob)
 
         # Activation function for the linear networks in the model.
-        self.relu = nn.LeakyReLU(inplace=True).to(torch_device)
+        self.relu = nn.LeakyReLU(inplace=True)
 
         # Batch normalization for training.
         self.bn = nn.BatchNorm1d(args.hidden_size)
 
         # Input linear model W_i used to calculate h0.
-        self.W_i = nn.Linear(atom_dim + bond_dim, args.hidden_size).to(torch_device)
+        self.W_i = nn.Linear(atom_dim + bond_dim, args.hidden_size)
 
         # Inner hidden linear model W_m used to calculate h{t+1}.
-        self.W_m = nn.Linear(args.hidden_size, args.hidden_size).to(torch_device)
+        self.W_m = nn.Linear(args.hidden_size, args.hidden_size)
 
         # Output linear model W_a used to calculate h{v}, the molecular representation of the result.
-        self.W_a = nn.Linear(atom_dim + args.hidden_size, args.hidden_size).to(torch_device)
+        self.W_a = nn.Linear(atom_dim + args.hidden_size, args.hidden_size)
 
     """
     Computes the next bond message for the given last hidden state.

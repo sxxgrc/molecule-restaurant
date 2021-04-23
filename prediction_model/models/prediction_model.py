@@ -40,24 +40,25 @@ class PredictionModel(nn.Module):
         # The layers of feed-forward neural networks which will compute the property 
         # prediction from the embedding.
         if (args.num_ffn_layers == 1):
-            ffn = [dropout, nn.Linear(args.hidden_size + features_dim, 1).to(torch_device)]
+            ffn = [dropout, nn.Linear(args.hidden_size + features_dim, 1)]
         else:
             # First layer.
-            ffn = [dropout, nn.Linear(args.hidden_size + features_dim, args.ffn_hidden_size).to(torch_device)]
+            ffn = [dropout, nn.Linear(args.hidden_size + features_dim, args.ffn_hidden_size)]
 
             # Middle layers.
             for _ in range(args.num_ffn_layers - 2):
                 ffn.extend([relu, dropout, 
-                    nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size).to(torch_device)])
+                    nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size)])
             
             # Final layer.
-            ffn.extend([relu, dropout, nn.Linear(args.ffn_hidden_size, 1).to(torch_device)])
+            ffn.extend([relu, dropout, nn.Linear(args.ffn_hidden_size, 1)])
         
         # Create final FFN model.
         self.ffn = nn.Sequential(*ffn).to(torch_device)
 
         # Initialize the weights for the model.
         for param in self.parameters():
+            print(param.names)
             if param.dim() == 1:
                 nn.init.constant_(param, 0)
             else:
@@ -78,6 +79,19 @@ class PredictionModel(nn.Module):
     """
     def forward(self, atom_features, bond_features, bond_index, molecule_features,
                 atom_incoming_bond_map, bond_reverse_map, num_bonds_per_atom, num_atoms_per_mol):
+
+        print("FFN parameters:")
+        for name, param in self.ffn.named_parameters():
+            print(name)
+            print(param.requires_grad)
+            print(param.grad)
+
+        print("Encoder parameters")
+        for name, param in self.encoder.named_parameters():
+            print(name)
+            print(param.requires_grad)
+            print(param.grad)
+
         # Compute prediction.
         output = self.encoder(atom_features, bond_features, bond_index, molecule_features, 
                               atom_incoming_bond_map, bond_reverse_map, num_bonds_per_atom,
@@ -100,11 +114,6 @@ Parameters:
     - torch_device : The device to send the tensors to.
 """
 def get_model_args_from_batch(extended_batch, torch_device):
-    print(extended_batch.atom_incoming_bond_map)
-    print(extended_batch.bond_reverse_map)
-    print(extended_batch.batch)
-    exit()
-
     # Send items from torch geometric batch to torch device.
     atom_features = extended_batch.batch.x.to(torch_device)
     bond_features = extended_batch.batch.edge_attr.to(torch_device)

@@ -41,7 +41,6 @@ def get_data():
 
     # Load the HIV dataset we will be using for this training.
     dataset = MoleculeNetFeaturesDataset(data_path, name="HIV")
-    dataset = dataset[:5120] # TODO
 
     # Compute loss positive weight.
     num_pos = sum([data.y for data in dataset]).detach().item()
@@ -169,7 +168,7 @@ def get_hiv_classifier(num_train_epochs, ensemble_size, torch_device, num_opt_it
             break
 
     # Initialize models. Everything should exist already so don't need data loaders.
-    atom_dim, bond_dim, features_dim = get_dimensions(None)
+    _, _, atom_dim, bond_dim, features_dim = get_data()
     models = generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, 
                                          torch_device, None, None, num_opt_iters, num_train_epochs)
     
@@ -178,4 +177,4 @@ def get_hiv_classifier(num_train_epochs, ensemble_size, torch_device, num_opt_it
         model.load_state_dict(torch.load(get_model_state_dict_path(idx)))
 
     # Create HIV classifier model object and return.
-    return HIVClassifier(models)
+    return HIVClassifier(models).to(torch_device)

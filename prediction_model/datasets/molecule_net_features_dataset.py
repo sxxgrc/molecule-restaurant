@@ -107,7 +107,6 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
                 continue
 
             xs = []
-            num_bonds_per_atom = []
             for atom in mol.GetAtoms():
                 x = []
                 x.append(x_map['atomic_num'].index(atom.GetAtomicNum()))
@@ -122,12 +121,11 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
                 x.append(x_map['is_aromatic'].index(atom.GetIsAromatic()))
                 x.append(x_map['is_in_ring'].index(atom.IsInRing()))
                 xs.append(x)
-                num_bonds_per_atom.append(int(len(atom.GetBonds()) / 2))
 
             x = torch.tensor(xs, dtype=torch.long).view(-1, 9)
-            num_bonds_per_atom = torch.tensor(num_bonds_per_atom, dtype=torch.int)
             num_atoms_per_mol = torch.tensor([len(mol.GetAtoms())], dtype=torch.int)
 
+            num_bonds_per_atom = [0] * len(mol.GetAtoms())
             edge_indices, edge_attrs = [], []
             for bond in mol.GetBonds():
                 i = bond.GetBeginAtomIdx()
@@ -141,9 +139,13 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
                 edge_indices += [[i, j], [j, i]]
                 edge_attrs += [e, e]
 
+                num_bonds_per_atom[i] += 1
+                num_bonds_per_atom[j] += 1
+
             edge_index = torch.tensor(edge_indices)
             edge_index = edge_index.t().to(torch.long).view(2, -1)
             edge_attr = torch.tensor(edge_attrs, dtype=torch.long).view(-1, 3)
+            num_bonds_per_atom = torch.tensor(num_bonds_per_atom, dtype=torch.int)
 
             # Sort indices.
             if edge_index.numel() > 0:
