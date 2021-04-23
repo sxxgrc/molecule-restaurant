@@ -1,4 +1,4 @@
-import torch
+import torch, numpy
 
 from torch.utils.data import DataLoader
 from torch.utils.data.dataloader import default_collate
@@ -15,8 +15,55 @@ This object provides the following additional values:
     - molecule_chunk_mask : List of masks which contain indices of each molecule's atoms.
 """
 class ExtendedBatch():
-    def __init__(self):
-        print("hji")
+    def __init__(self, torch_geometric_batch):
+        self.batch = torch_geometric_batch
+        self.atom_incoming_bond_map = self.get_atom_incoming_bond_map()
+        self.bond_reverse_map = self.get_bond_reverse_map()
+
+        # Convert count tensors into lists.
+        self.batch.num_bonds_per_atom = self.batch.num_bonds_per_atom.tolist()
+        self.batch.num_atoms_per_mol = self.batch.num_atoms_per_mol.tolist()
+
+    """
+    Generates a mapping of each atom to the indices of the bonds coming into that atom.
+    """
+    def get_atom_incoming_bond_map(self):
+        # Get necessary values.
+        num_atoms = self.batch.x.shape[0]
+        incoming_edge_points = self.batch.edge_index[1].numpy()
+
+        # Initialize mapping.
+        a2b = [[] for _ in range(num_atoms)]
+
+        # Find all of the indices where the atom is the end point of an edge. We add 1
+        # to the index to account for padding.
+        max_bonds = 0
+        for edge_idx in range(len(incoming_edge_points)):
+            a2b[incoming_edge_points[edge_idx]].append(edge_idx + 1)
+            max_bonds = max(max_bonds, len(a2b[incoming_edge_points[edge_idx]]))
+        
+        # Pad the mapping with zeros and convert to tensor.
+        a2b = [numpy.pad(a2b[idx], (0, max_bonds - len(a2b[idx])), 'constant') 
+            for idx in range(num_atoms)]
+        return torch.as_tensor(a2b, dtype=torch.int)
+    
+    """
+    Generates a mapping of each bond to the index of its reverse bond.
+    That is, for the bond {0, 1}, this function will generate a tensor where the initial
+    index for {0, 1} will contain the index of the bond {1, 0}.
+    """
+    def get_bond_reverse_map(self):
+        edge_index = self.batch.edge_index.numpy()
+        num_edges = self.batch.edge_index.shape[1]
+
+        # Generate mapping of each edge to its index.
+        edge_index_map = {(edge_index[0][idx], edge_index[1][idx]) : idx
+            for idx in range(num_edges)}
+
+        # Generate the bond reverse map.
+        b2rev = [edge_index_map[(edge_index[1][idx], edge_index[0][idx])] 
+            for idx in range(num_edges)]
+        return torch.as_tensor(b2rev, dtype=torch.int)
 
 """
 Collater which collates the separate molecules into one batch.
@@ -26,8 +73,7 @@ class ExtendedCollater(object):
     def torch_geometric_collate(self, batch):
         elem = batch[0]
         if isinstance(elem, Data):
-            return Batch.from_data_list(batch, self.follow_batch,
-                                        self.exclude_keys)
+            return Batch.from_data_list(batch, [], [])
         elif isinstance(elem, torch.Tensor):
             return default_collate(batch)
         elif isinstance(elem, float):
@@ -37,17 +83,16 @@ class ExtendedCollater(object):
         elif isinstance(elem, string_classes):
             return batch
         elif isinstance(elem, container_abcs.Mapping):
-            return {key: self.collate([d[key] for d in batch]) for key in elem}
+            return {key: self.torch_geometric_collate([d[key] for d in batch]) for key in elem}
         elif isinstance(elem, tuple) and hasattr(elem, '_fields'):
-            return type(elem)(*(self.collate(s) for s in zip(*batch)))
+            return type(elem)(*(self.torch_geometric_collate(s) for s in zip(*batch)))
         elif isinstance(elem, container_abcs.Sequence):
-            return [self.collate(s) for s in zip(*batch)]
+            return [self.torch_geometric_collate(s) for s in zip(*batch)]
 
         raise TypeError('DataLoader found invalid type: {}'.format(type(elem)))
 
     def collate(self, batch):
         torch_geometric_batch = self.torch_geometric_collate(batch)
-        print("Hi ^_^")
         return ExtendedBatch(torch_geometric_batch)
 
     def __call__(self, batch):

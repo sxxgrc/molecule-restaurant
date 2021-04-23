@@ -78,17 +78,17 @@ class DMPNNEncoder(nn.Module):
     Parameters:
         - atom_features : Tensor mapping each atom of each molecule to its features.
         - bond_features : Tensor mapping each bond (in both directions) of each molecule to its features.
-        - bond_index : Tensor containing the atoms that make up each bond (one row for origin and one for target).
+        - bond_origins : Tensor containing the atoms that originate each bond.
         - molecule_features : Tensor mapping each molecule to its features.
         - atom_incoming_bond_map : Tensor mapping each atom to the indices of its incoming bonds.
         - bond_reverse_map : Tensor mapping each bond to the index of its reverse.
-        - atom_chunk_mask : List of masks which contain the indices of each atom's bonds.
-        - molecule_chunk_mask : List of masks which contain indices of each molecule's atoms.
+        - num_bonds_per_atom : List containing the number of bonds for each atom.
+        - num_atoms_per_mol : List containing the number of atoms for each molecule.
     """
-    def forward(self, atom_features, bond_features, bond_index, molecule_features, atom_incoming_bond_map,
-                bond_reverse_map, atom_chunk_mask, molecule_chunk_mask):
+    def forward(self, atom_features, bond_features, bond_origins, molecule_features, atom_incoming_bond_map,
+                bond_reverse_map, num_bonds_per_atom, num_atoms_per_mol):
         # Concatenate the edge feature matrix with the node feature matrix (edge vw concats with node v).
-        expanded_x = torch.index_select(atom_features, 0, bond_index[0])
+        expanded_x = torch.index_select(atom_features, 0, bond_origins)
         edge_node_feat_mat = torch.cat((bond_features, expanded_x), dim=1).float()
 
         # Generate h_0 for each edge.
@@ -96,7 +96,7 @@ class DMPNNEncoder(nn.Module):
         h_t = h_0
         
         # Expand the atom to incoming bond map for all of the bonds in the dataset.
-        bond_incoming_bond_map = torch.index_select(atom_incoming_bond_map, 0, bond_index[0])
+        bond_incoming_bond_map = torch.index_select(atom_incoming_bond_map, 0, bond_origins)
 
         # Message passing phase.
         for _ in range(self.message_passing_depth):
@@ -111,13 +111,9 @@ class DMPNNEncoder(nn.Module):
             h_t = self.dropout_layer(h_t)
 
         # Get atom-wise representation of messages. Some atoms have 0 bonds so we deal with that as well.
-        print("6")
-        atom_chunks = [h_t[mask] for mask in atom_chunk_mask]
-        print("7")
-        summed_atom_chunks = [torch.sum(atom_chunk, 0) if atom_chunk.numel() else 
-                              self.cached_zero_vector for atom_chunk in atom_chunks]
-        print("8")
-        m_v = torch.stack(summed_atom_chunks)
+        atom_chunks = torch.split(h_t, num_bonds_per_atom)
+        m_v = torch.stack([torch.sum(atom_chunk, 0) if atom_chunk.numel() else 
+                              self.cached_zero_vector for atom_chunk in atom_chunks])
 
         # Get the atom-wise representation of hidden states by concating node features to node messages.
         node_feat_message = torch.cat((atom_features, m_v), dim=1)
@@ -125,11 +121,8 @@ class DMPNNEncoder(nn.Module):
         h_v = self.dropout_layer(h_v)
 
         # Readout phase, which creates the molecule representation from the atom representations.
-        print("9")
-        molecule_chunks = [h_v[mask] for mask in molecule_chunk_mask]
-        print("10")
+        molecule_chunks = torch.split(h_v, num_atoms_per_mol)
         h = torch.stack([torch.sum(molecule_chunk, 0) for molecule_chunk in molecule_chunks])
-        print("11")
 
         # Concatenate molecular representation with external features and output.
         final_representation = torch.cat((h, molecule_features), dim=1)

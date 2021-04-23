@@ -22,15 +22,18 @@ from prediction_model.models import (
     train_ensemble,
     test_ensemble)
 
-from torch_geometric.data import DataLoader
-
 # The path for the saved model.
 SAVE_PATH = str(Path().absolute()) + "/prediction_model/trained_models/"
 
 """
 Gets the data for training the HIV model.
-Also computes the loss positive weight to use, calculated as: 
-number of negative classes / number of positive classes.
+
+Returns:
+    - dataset : The HIV dataset to use for training.
+    - loss_pos : The loss positive weight to use for computing the loss.
+    - atom_dim : The dimension of the atom features in the dataset.
+    - bond_dim : The dimension of the bond features in the dataset.
+    - features_dim : The dimension of the molecule features in the dataset.
 """
 def get_data():
     # Data path to store the dataset to train on.
@@ -44,7 +47,12 @@ def get_data():
     num_pos = sum([data.y for data in dataset]).detach().item()
     num_neg = len(dataset) - num_pos
 
-    return dataset, num_neg / num_pos
+    # Compute dimensions.
+    atom_dim = dataset[0].x.shape[1]
+    bond_dim = dataset[0].edge_attr.shape[1]
+    features_dim = dataset[0].features.shape[1]
+
+    return dataset, num_neg / num_pos, atom_dim, bond_dim, features_dim
 
 """
 Data preparation for the HIV dataset.
@@ -55,7 +63,7 @@ def prepare_train_test_data(dataset, frac_train=0.8, frac_test=0.2, batch_size=3
     # Split the dataset into train and test datasets and create data loaders for them.
     if (frac_train == 1.0):
         # No reason to split.
-        train_loader = DataLoader(dataset, batch_size=batch_size)
+        train_loader = ExtendedDataLoader(dataset, batch_size=batch_size)
         test_loader = None
     else:
         print("Splitting the data...")
@@ -63,9 +71,9 @@ def prepare_train_test_data(dataset, frac_train=0.8, frac_test=0.2, batch_size=3
         train_dataset, test_dataset = scaffold_splitter.split(frac_train, frac_test)
         print("Finished splitting.")
 
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, 
+        train_loader = ExtendedDataLoader(train_dataset, batch_size=batch_size, shuffle=True, 
             num_workers=4, pin_memory=True)
-        test_loader = DataLoader(test_dataset, batch_size=batch_size, num_workers=4, pin_memory=True)
+        test_loader = ExtendedDataLoader(test_dataset, batch_size=batch_size, num_workers=4, pin_memory=True)
     return train_loader, test_loader
 
 """
@@ -102,32 +110,6 @@ def generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim,
     return models
 
 """
-Gets dimension information from the HIV dataset.
-
-Parameters:
-    - data_loader : The data loader for the HIV dataset. If this is None, we create one.
-
-Returns:
-    - atom_dim : The dimension of the atom features in the dataset.
-    - bond_dim : The dimension of the bond features in the dataset.
-    - features_dim : The dimension of the molecule features in the dataset.
-"""
-def get_dimensions(data_loader):
-    # Generate a data loader for the HIV dataset if none were given.
-    if data_loader == None:
-        data_loader, _ = prepare_train_test_data(frac_train=1.0, frac_test=0)
-    
-    # Compute the dimension values based off the dataset.
-    data_view = next(iter(data_loader))
-    print(data_view)
-    print(data_view.num_bonds_per_atom)
-    print(data_view.num_atoms_per_mol)
-    atom_dim = data_view.x.shape[1]
-    bond_dim = data_view.edge_attr.shape[1]
-    features_dim = data_view.features.shape[1]
-    return atom_dim, bond_dim, features_dim
-
-"""
 Helper method for getting the path to a model's saved state dict.
 """
 def get_model_state_dict_path(model_idx):
@@ -141,7 +123,7 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
     print("Generating a new HIV replication inhibition classifier. Mind the noise!")
 
     # Prepare the train and test data.
-    data, loss_pos_weight = get_data()
+    data, loss_pos_weight, atom_dim, bond_dim, features_dim = get_data()
     train_loader, test_loader = prepare_train_test_data(data, batch_size=batch_size)
 
     # Convert loss pos weight to tensor.
@@ -149,7 +131,6 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
 
     # Generate the models.
     print("Initializing the HIV models...")
-    atom_dim, bond_dim, features_dim = get_dimensions(train_loader)
     models = generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, torch_device, 
                                  train_loader, test_loader, num_opt_iters, num_train_epochs, 
                                  loss_pos_weight, 0)

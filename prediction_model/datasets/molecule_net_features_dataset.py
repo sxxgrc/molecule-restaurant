@@ -125,8 +125,8 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
                 num_bonds_per_atom.append(int(len(atom.GetBonds()) / 2))
 
             x = torch.tensor(xs, dtype=torch.long).view(-1, 9)
-            num_bonds_per_atom = torch.tensor(num_bonds_per_atom, dtype=torch.int())
-            num_atoms_per_mol = [len(mol.GetAtoms())]
+            num_bonds_per_atom = torch.tensor(num_bonds_per_atom, dtype=torch.int)
+            num_atoms_per_mol = torch.tensor([len(mol.GetAtoms())], dtype=torch.int)
 
             edge_indices, edge_attrs = [], []
             for bond in mol.GetBonds():
