@@ -74,8 +74,10 @@ def prepare_train_test_data(dataset, frac_train=0.8, frac_test=0.2, batch_size=3
         print("Finished splitting.")
 
         # Create datasets for the train and test data which normalize them.
+        print("Creating train and test datasets and normalizing them...")
         train_dataset = MoleculeDataset(root=main_path, name="train", dataset=train_dataset)
         test_dataset = MoleculeDataset(root=main_path, name="test", dataset=test_dataset)
+        print("Done!")
     else:
         # Get datasets.
         train_dataset = MoleculeDataset(root=main_path, name="train")
