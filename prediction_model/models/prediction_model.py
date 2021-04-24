@@ -157,8 +157,8 @@ def train_prediction_model(model, data_loader, criterion, torch_device, optimize
         # Perform back propagation and optimization.
         scaler.scale(loss).backward()
         nn.utils.clip_grad_value_(model.parameters(), clip_value=1.0)
-        print("LOSS: " + str(loss.detach().item()))
         loss_sum += loss.detach().item() # Get loss item after back propagation.
+        print("LOSS=" + str(loss.detach().item()))
         scaler.step(optimizer)
         original_scale = scaler.get_scale()
         scaler.update()
@@ -169,6 +169,7 @@ def train_prediction_model(model, data_loader, criterion, torch_device, optimize
             scheduler.step()
     
     print("Post-training prediction model loss: " + str(loss_sum / len(data_loader)))
+    print()
 
 
 """

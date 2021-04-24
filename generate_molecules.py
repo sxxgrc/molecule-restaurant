@@ -20,4 +20,4 @@ device = torch.device(dev)
 print()
 print("Using PyTorch device : " + str(device))
 
-hiv_classifier = get_hiv_classifier(50, 5, device, 15, 512)
+hiv_classifier = get_hiv_classifier(50, 5, device, 20, 512)
