@@ -29,7 +29,10 @@ class PredictionModel(nn.Module):
         self.encoder = DMPNNEncoder(args, atom_dim, bond_dim, torch_device).to(torch_device)
 
         # Activation function for the middle feed forward neural networks.
-        relu = nn.LeakyReLU(inplace=True).to(torch_device)
+        relu = nn.ReLU(inplace=True).to(torch_device)
+
+        # Batch normalization.
+        bn = nn.BatchNorm1d(args.ffn_hidden_size)
 
         # Activation function for the final prediction computation.
         self.sigmoid = nn.Sigmoid().to(torch_device)
@@ -47,7 +50,7 @@ class PredictionModel(nn.Module):
 
             # Middle layers.
             for _ in range(args.num_ffn_layers - 2):
-                ffn.extend([relu, dropout, 
+                ffn.extend([bn, relu, dropout, 
                     nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size)])
             
             # Final layer.
@@ -164,21 +167,6 @@ def train_prediction_model(model, data_loader, criterion, torch_device, optimize
         # issues from scaler.
         if original_scale == scaler.get_scale():
             scheduler.step()
-        
-        if False:
-            print("FFN parameters:")
-            for name, param in model.ffn.named_parameters():
-                if param.requires_grad:
-                    print(name)
-                    print(param.data)
-                    print(param.grad)
-
-            print("Encoder parameters")
-            for name, param in model.encoder.named_parameters():
-                if param.requires_grad:
-                    print(name)
-                    print(param.data)
-                    print(param.grad)
     
     print("Post-training prediction model loss: " + str(loss_sum / len(data_loader)))
 

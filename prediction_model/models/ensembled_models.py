@@ -33,8 +33,8 @@ def train_ensemble(models, num_epochs, train_loader, test_loader, train_func,
         best_roc_auc = -1
 
         # Get optimizer and learning rate scheduler.
-        optimizer = AdamW(model.parameters(), lr=1e-3, weight_decay=0)
-        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=1e-3, epochs=num_epochs,
+        optimizer = AdamW(model.parameters(), lr=1e-5)
+        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=1e-5, epochs=num_epochs,
             steps_per_epoch=len(train_loader))
 
         # Scaler for mixed precision training.
@@ -49,12 +49,12 @@ def train_ensemble(models, num_epochs, train_loader, test_loader, train_func,
             train_func(model, train_loader, loss_func, torch_device, optimizer, scheduler, scaler)
             f1, roc_auc = test_func(model, test_loader, torch_device, pos_label)
             print("F1=" + str(f1) + " ROC AUC=" + str(roc_auc))
-            
+
             # Save model state if it's the best we have seen so far.
             if roc_auc > best_roc_auc:
                 best_roc_auc = roc_auc
                 best_model_state_dict = deepcopy(model.state_dict())
-        
+
         # Set model to its best version.
         model.load_state_dict(best_model_state_dict)
 

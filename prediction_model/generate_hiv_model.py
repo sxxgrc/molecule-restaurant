@@ -46,14 +46,14 @@ def get_data():
     # Compute loss positive weight.
     num_pos = sum([data.y for data in dataset]).detach().item()
     num_neg = len(dataset) - num_pos
+    loss_pos_weight = num_neg / num_pos
 
     # Compute dimensions.
     atom_dim = dataset[0].x.shape[1]
     bond_dim = dataset[0].edge_attr.shape[1]
     features_dim = dataset[0].features.shape[0]
-    print(features_dim)
 
-    return dataset, num_neg / num_pos, atom_dim, bond_dim, features_dim
+    return dataset, loss_pos_weight, atom_dim, bond_dim, features_dim
 
 """
 Data preparation for the HIV dataset.
@@ -63,10 +63,10 @@ Produces a train and test data loader, where the data split by molecular scaffol
 def prepare_train_test_data(dataset, frac_train=0.8, frac_test=0.2, batch_size=32):
     # Check if train and test data already exist.
     main_path = str(Path().absolute()) + "/prediction_model/data/torch-geometric/hiv/normalized"
-    train_path = main_path + "/train.dt"
-    test_path = main_path + "/test.dt"
-    if (not path.exists(train_path) or not path.getsize(train_path) > 0 or not path.exists(test_path)
-        or not path.getsize(test_path) > 0):
+    train_path = main_path + "/train.pt"
+    test_path = main_path + "/test.pt"
+    if (not path.exists(train_path) or path.getsize(train_path) == 0) or (not path.exists(test_path)
+        or path.getsize(test_path) == 0):
         # Split the dataset into train and test datasets by scaffold.
         print("Splitting the data...")
         scaffold_splitter = ScaffoldSplitter()
@@ -77,15 +77,10 @@ def prepare_train_test_data(dataset, frac_train=0.8, frac_test=0.2, batch_size=3
         print("Creating train and test datasets and normalizing them...")
         train_dataset = MoleculeDataset(root=main_path, name="train", dataset=train_dataset)
         test_dataset = MoleculeDataset(root=main_path, name="test", dataset=test_dataset)
-        print("Done!")
     else:
         # Get datasets.
         train_dataset = MoleculeDataset(root=main_path, name="train")
         test_dataset = MoleculeDataset(root=main_path, name="test")
-
-
-    print(dataset[0].features.shape)
-    print(train_dataset[0].features.shape)
 
     # Create data loaders for train and test data.
     train_loader = ExtendedDataLoader(train_dataset, batch_size=batch_size, shuffle=True, 
