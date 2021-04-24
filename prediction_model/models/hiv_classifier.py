@@ -7,6 +7,8 @@ The full HIV replication inhibition classifier model.
 This model is built from an ensemble of PredictionModel objects which were trained on HIV replication
 inhibition data.
 Note that this model is built from other trained models, so this model does not need to be trained.
+
+Predicts whether a molecule will inhibit HIV replication (0) or not (1).
 """
 class HIVClassifier(nn.Module):
     """

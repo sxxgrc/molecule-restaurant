@@ -2,6 +2,7 @@ import torch, numpy
 
 from torch.utils.data import DataLoader
 from torch.utils.data.dataloader import default_collate
+from torch.utils.data.sampler import WeightedRandomSampler
 from torch._six import container_abcs, string_classes, int_classes
 
 from torch_geometric.data import Data, Batch
@@ -104,11 +105,33 @@ Also an extended version of the Dataloader used by torch geometric.
 """
 class ExtendedDataLoader(DataLoader):
     """
-    Parameters:
-        dataset : The dataset from which to load the data.
-        batch_size : How many samples per batch to load.
-        shuffle : If set to True, the data will be reshuffled at every epoch.
+    Creates a weighted random sampler for the dataset, which attributes weights
+    to each class in the data. Works to diminish the issue of imbalance in datasets.
     """
-    def __init__(self, dataset, batch_size=1, shuffle=False, **kwargs):
-        super(ExtendedDataLoader, self).__init__(dataset, batch_size, shuffle,
-                                        collate_fn=ExtendedCollater(), **kwargs)
+    def create_weighted_sampler(self, dataset):
+        # Get weight for each class according to how many times it appears.
+        num_pos = sum([data.y for data in dataset]).detach().item()
+        num_neg = len(dataset) - num_pos
+        weight_per_class = [len(dataset) / num_neg, len(dataset) / num_pos]
+
+        # Get weights for each data item.
+        weight_per_item = [weight_per_class[data.y.int()] for data in dataset]
+        weights = torch.as_tensor(weight_per_item, dtype=torch.double)
+
+        # Create sampler.
+        return WeightedRandomSampler(weights, len(dataset))
+
+    """
+    Parameters:
+        - dataset : The dataset from which to load the data.
+        - sampler : Whether to use a weighted random sampler or not.
+        - batch_size : How many samples per batch to load.
+        - shuffle : If set to True, the data will be reshuffled at every epoch.
+    """
+    def __init__(self, dataset, sampler=False, batch_size=1, shuffle=False, **kwargs):
+        weighted_sampler = None
+        if (sampler):
+            weighted_sampler = self.create_weighted_sampler(dataset)
+
+        super(ExtendedDataLoader, self).__init__(dataset, batch_size, shuffle, collate_fn=ExtendedCollater(),
+                                                 sampler=weighted_sampler, **kwargs)

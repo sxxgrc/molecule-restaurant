@@ -22,9 +22,10 @@ Parameters:
     - torch_device : The device to store the data in.
     - loss_pos_weight : Amount to weigh the positive labels in loss function.
     - pos_label : What to consider "positive" for F1 calculation.
+    - lr : The learning rate to use.
 """
 def train_ensemble(models, num_epochs, train_loader, test_loader, train_func, 
-    test_func, torch_device, loss_pos_weight, pos_label):
+    test_func, torch_device, loss_pos_weight, pos_label, lr):
     # Iterate through models and train each one.
     for idx, model in enumerate(models):
         print()
@@ -33,8 +34,8 @@ def train_ensemble(models, num_epochs, train_loader, test_loader, train_func,
         best_roc_auc = -1
 
         # Get optimizer and learning rate scheduler.
-        optimizer = AdamW(model.parameters(), lr=1e-5)
-        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=1e-5, epochs=num_epochs,
+        optimizer = AdamW(model.parameters(), lr=lr)
+        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=lr, epochs=num_epochs,
             steps_per_epoch=len(train_loader))
 
         # Scaler for mixed precision training.

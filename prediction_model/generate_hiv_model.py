@@ -83,7 +83,7 @@ def prepare_train_test_data(dataset, frac_train=0.8, frac_test=0.2, batch_size=3
         test_dataset = MoleculeDataset(root=main_path, name="test")
 
     # Create data loaders for train and test data.
-    train_loader = ExtendedDataLoader(train_dataset, batch_size=batch_size, shuffle=True, 
+    train_loader = ExtendedDataLoader(train_dataset, sampler=True, batch_size=batch_size, 
         num_workers=4, pin_memory=True)
     test_loader = ExtendedDataLoader(test_dataset, batch_size=batch_size, num_workers=4, pin_memory=True)
     return train_loader, test_loader
@@ -105,14 +105,15 @@ Parameters:
     - num_epochs : The number of epochs to train each model for.
     - loss_pos_weight : Amount to weigh the positive labels in loss function.
     - pos_label : What to consider "positive" for F1 calculation.
+    - lr : The learning rate to use.
 """
 def generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, torch_device,
                         train_loader, test_loader, num_opt_iters, num_epochs, loss_pos_weight,
-                        pos_label):
+                        pos_label, lr):
     # Get the optimized hyperparameters for the models.
     model_args = get_optimized_hyperparameters(atom_dim, bond_dim, features_dim, torch_device, 
                                                 train_loader, test_loader, num_opt_iters, 
-                                                num_epochs // 2, loss_pos_weight, pos_label)
+                                                num_epochs // 2, loss_pos_weight, pos_label, lr)
     
     # Generate the models.
     models = [
@@ -141,20 +142,23 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
     # Convert loss pos weight to tensor.
     loss_pos_weight = torch.tensor(loss_pos_weight, device=torch_device)
 
+    # Learning rate to use.
+    lr = 0.01
+
     # Generate the models.
     print("Initializing the HIV models...")
     models = generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, torch_device, 
                                  train_loader, test_loader, num_opt_iters, num_train_epochs, 
-                                 loss_pos_weight, 0)
+                                 loss_pos_weight, 1, lr)
     print("Done initializing the models.")
 
     # Train the ensembled models.
     print("Training the ensemble...")
     train_ensemble(models, num_train_epochs, train_loader, test_loader, train_prediction_model,
-                   test_prediction_model, torch_device, loss_pos_weight, 0)
+                   test_prediction_model, torch_device, loss_pos_weight, 1, lr)
 
     # Test the ensembled model.
-    f1, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device, 0)
+    f1, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device, 1)
     print("Results of final ensembled model: F1=" + str(f1) + ", ROC AUC=" + str(roc_auc))
 
     # Save each of the models to the save path.

@@ -23,9 +23,9 @@ from numpy.random import RandomState
 # We are using the same space as used in chemprop, along with a few changes.
 SPACE = {
     "dropout_prob": hp.quniform("dropout_prob", low=0.0, high=0.4, q=0.05),
-    "message_passing_depth": hp.quniform("message_passing_depth", low=2, high=6, q=1),
+    "message_passing_depth": hp.quniform("message_passing_depth", low=3, high=7, q=1),
     "hidden_size": hp.quniform("hidden_size", low=300, high=2400, q=100),
-    "num_ffn_layers": hp.quniform("num_ffn_layers", low=1, high=3, q=1),
+    "num_ffn_layers": hp.quniform("num_ffn_layers", low=2, high=4, q=1),
     "ffn_hidden_size": hp.quniform("ffn_hidden_size", low=300, high=2400, q=100),
     "ffn_dropout_prob": hp.quniform("ffn_dropout_prob", low=0.0, high=0.4, q=0.05)
 }
@@ -52,10 +52,11 @@ Parameters:
     - num_epochs : The number of epochs to train each model for.
     - loss_pos_weight : Amount to weigh the positive labels in loss function.
     - pos_label : What to consider "positive" for F1 calculation.
+    - lr : The learning rate to use.
 """
 def optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device, 
                              train_loader, test_loader, num_optimization_iters, num_epochs,
-                             loss_pos_weight, pos_label):
+                             loss_pos_weight, pos_label, lr):
     print("Optimizing hyperparameters...")
     
     # Initialize model arguments.
@@ -69,16 +70,27 @@ def optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device,
         for key in INT_KEYS:
             hyperparams[key] = int(hyperparams[key])
         
-        # Generate model arguments from hyperparams.
-        hyper_args = deepcopy(model_args)
+        # TODO:
+        # # Generate model arguments from hyperparams.
+        # hyper_args = deepcopy(model_args)
 
-        for key, value in hyperparams.items():
-            setattr(hyper_args, key, value)
+        # for key, value in hyperparams.items():
+        #     setattr(hyper_args, key, value)
+        hyper_args = ModelArgs(dropout_prob=0.1, message_passing_depth=4, hidden_size=500,
+                               num_ffn_layers=2, ffn_hidden_size=500, ffn_dropout_prob=0.1)
+
+        print("Trying following hyperparameters:")
+        print("MPNN Dropout Prob=" + str(hyper_args.dropout_prob))
+        print("Message Passing Depth=" + str(hyper_args.message_passing_depth))
+        print("MPNN Hidden Size=" + str(hyper_args.hidden_size))
+        print("Number of FFN Layers=" + str(hyper_args.num_ffn_layers))
+        print("FFN Hidden Size=" + str(hyper_args.ffn_hidden_size))
+        print("FFN Dropout Prob=" + str(hyper_args.ffn_dropout_prob))
 
         # Create, train, and test the models.
         model = [create_prediction_model(hyper_args, atom_dim, bond_dim, features_dim, torch_device)]
         train_ensemble(model, num_epochs, train_loader, test_loader, train_prediction_model, 
-                       test_prediction_model, torch_device, loss_pos_weight, pos_label)
+                       test_prediction_model, torch_device, loss_pos_weight, pos_label, lr)
         f1, roc_auc = test_ensemble(model, test_loader, get_predictions, torch_device, pos_label)
         print("Results of model: F1=" + str(f1) + ", ROC AUC=" + str(roc_auc))
 
@@ -106,12 +118,12 @@ Gets the optimized hyperparameters for the full ensembled prediction model.
 """
 def get_optimized_hyperparameters(atom_dim, bond_dim, features_dim, torch_device, 
                              train_loader, test_loader, num_optimization_iters, num_epochs, 
-                             loss_pos_weight, pos_label):
+                             loss_pos_weight, pos_label, lr):
     # Check if parameters are in file, creating them if not.
     if not path.exists(SAVE_PATH) or not path.getsize(SAVE_PATH) > 0:
         optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device,
                                  train_loader, test_loader, num_optimization_iters, num_epochs, 
-                                 loss_pos_weight, pos_label)
+                                 loss_pos_weight, pos_label, lr)
     
     # Load the parameters from the JSON file.
     with open(SAVE_PATH, "r") as json_file:
