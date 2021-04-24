@@ -9,7 +9,7 @@ from pathlib import Path
 
 from os import path
 
-from prediction_model.datasets import MoleculeNetFeaturesDataset, normalize_features
+from prediction_model.datasets import MoleculeNetFeaturesDataset, MoleculeDataset
 from prediction_model.dataloaders import ExtendedDataLoader
 from prediction_model.splitters import ScaffoldSplitter
 from prediction_model.optimization import get_optimized_hyperparameters
@@ -20,7 +20,8 @@ from prediction_model.models import (
     test_prediction_model, 
     get_predictions,
     train_ensemble,
-    test_ensemble)
+    test_ensemble
+)
 
 # The path for the saved model.
 SAVE_PATH = str(Path().absolute()) + "/prediction_model/trained_models/"
@@ -60,29 +61,34 @@ Data preparation for the HIV dataset.
 Produces a train and test data loader, where the data split by molecular scaffold similarity.
 """
 def prepare_train_test_data(dataset, frac_train=0.8, frac_test=0.2, batch_size=32):
-    # Split the dataset into train and test datasets and create data loaders for them.
-    print(dataset.get_len())
-    if (frac_train == 1.0):
-        # No reason to split.
-        train_loader = ExtendedDataLoader(dataset, batch_size=batch_size)
-        test_loader = None
-    else:
+    # Check if train and test data already exist.
+    main_path = str(Path().absolute()) + "/prediction_model/data/torch-geometric/hiv/normalized"
+    train_path = main_path + "/train.dt"
+    test_path = main_path + "/test.dt"
+    if (not path.exists(train_path) or not path.getsize(train_path) > 0 or not path.exists(test_path)
+        or not path.getsize(test_path) > 0):
+        # Split the dataset into train and test datasets by scaffold.
         print("Splitting the data...")
         scaffold_splitter = ScaffoldSplitter()
         train_dataset, test_dataset = scaffold_splitter.split(dataset, frac_train, frac_test)
         print("Finished splitting.")
-        print(train_dataset.get_len())
-        print(test_dataset.get_len())
 
-        print("Normalizing the data...")
-        normalize_features(train_dataset)
-        normalize_features(test_dataset)
-        print("Finished normalizing.")
-        print(train_dataset[0].features.shape)
+        # Create datasets for the train and test data which normalize them.
+        train_dataset = MoleculeDataset(root=main_path, name="train", dataset=train_dataset)
+        test_dataset = MoleculeDataset(root=main_path, name="test", dataset=test_dataset)
+    else:
+        # Get datasets.
+        train_dataset = MoleculeDataset(root=main_path, name="train")
+        test_dataset = MoleculeDataset(root=main_path, name="test")
 
-        train_loader = ExtendedDataLoader(train_dataset, batch_size=batch_size, shuffle=True, 
-            num_workers=4, pin_memory=True)
-        test_loader = ExtendedDataLoader(test_dataset, batch_size=batch_size, num_workers=4, pin_memory=True)
+
+    print(dataset[0].features.shape)
+    print(train_dataset[0].features.shape)
+
+    # Create data loaders for train and test data.
+    train_loader = ExtendedDataLoader(train_dataset, batch_size=batch_size, shuffle=True, 
+        num_workers=4, pin_memory=True)
+    test_loader = ExtendedDataLoader(test_dataset, batch_size=batch_size, num_workers=4, pin_memory=True)
     return train_loader, test_loader
 
 """

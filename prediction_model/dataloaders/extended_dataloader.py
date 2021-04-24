@@ -99,7 +99,7 @@ class ExtendedCollater(object):
         return self.collate(batch)
 
 """
-Dataloader which wraps around a MoleculeNetFeaturesDataset and uses the ExtendedCollater.
+Dataloader which wraps around a MoleculeDataset and uses the ExtendedCollater.
 Also an extended version of the Dataloader used by torch geometric.
 """
 class ExtendedDataLoader(DataLoader):

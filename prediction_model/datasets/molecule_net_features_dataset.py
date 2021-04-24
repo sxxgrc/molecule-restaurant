@@ -4,10 +4,8 @@ from torch_geometric.datasets import MoleculeNet
 from torch_geometric.data import Data, download_url, extract_gz
 
 from chemprop.features import morgan_binary_features_generator
-from chemprop.data import StandardScaler
 
 from rdkit import Chem
-from numpy import vstack
 
 x_map = {
     'atomic_num':
@@ -68,15 +66,8 @@ for each molecule as well.
 class MoleculeNetFeaturesDataset(MoleculeNet):
     def __init__(self, root, name):
         super(MoleculeNetFeaturesDataset, self).__init__(root, name)
-    
-    @property
-    def raw_file_names(self):
-        return f'{self.names[self.name][2]}.csv'
 
-    @property
-    def processed_file_names(self):
-        return 'data.pt'
-
+    # Copied over from MoleculeNet.
     def download(self):
         url = self.url.format(self.names[self.name][1])
         path = download_url(url, self.raw_dir)
@@ -153,7 +144,7 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
                 edge_index, edge_attr = edge_index[:, perm], edge_attr[perm]
 
             # Generate feature vector for molecule.
-            features = torch.as_tensor(morgan_binary_features_generator(mol)).unsqueeze(0)
+            features = torch.as_tensor(morgan_binary_features_generator(mol))
 
             # Create data item for this molecule.
             data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y,
@@ -169,54 +160,3 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
             data_list.append(data)
 
         torch.save(self.collate(data_list), self.processed_paths[0])
-
-    def get_len(self):
-        return len(self)
-
-"""
-Normalizes the features for a given dataset.
-Specifically, normalizes the atom, edge, and molecule features for the dataset.
-"""
-def normalize_features(dataset):
-    # Get all data features for normalization.
-    all_molecule_features = []
-    all_atom_features = []
-    all_edge_features = []
-    for d in dataset:
-        all_molecule_features.append(d.features)
-        all_atom_features += d.x
-        all_edge_features += d.edge_attr
-    
-    # Normalize the molecule features in the data.
-    molecule_features_scaler = StandardScaler(replace_nan_token=0)
-    molecule_features_scaler.fit(vstack(all_molecule_features))
-
-    # Normalize the atom features in the data.
-    atom_features_scaler = StandardScaler(replace_nan_token=0)
-    atom_features_scaler.fit(vstack(all_atom_features))
-
-    # Normalize the edge features in the data.
-    edge_features_scaler = StandardScaler(replace_nan_token=0)
-    edge_features_scaler.fit(vstack(all_edge_features))
-
-    # Add in new values for data features.
-    for idx, d in enumerate(dataset):
-        dataset[idx].features = (torch.as_tensor(
-            molecule_features_scaler.transform(d.features.reshape(1, -1)[0]), 
-            dtype=torch.long).unsqueeze(0))
-        
-        xs = []
-        for x in d.x:
-            xs.append(torch.as_tensor(
-                atom_features_scaler.transform(x.reshape(1, -1)[0]),
-                dtype=torch.long))
-        dataset[idx].x = torch.stack(xs)
-
-        edge_attrs = []
-        for edge_attr in d.edge_attr:
-            edge_attrs.append(torch.as_tensor(
-                edge_features_scaler.transform(edge_attr.reshape(1, -1)[0]),
-                dtype=torch.long))
-        dataset[idx].edge_attr = torch.stack(edge_attrs)
-
-    print(dataset[0].features.shape)
