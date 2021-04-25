@@ -3,6 +3,8 @@ from rdkit.Chem.Scaffolds.MurckoScaffold import MurckoScaffoldSmiles
 
 from numpy.testing import assert_almost_equal
 
+from random import Random
+
 """
 A generic dataset splitter which splits the dataset into a train set and 
 test set according to the similarity of the dataset's molecule's scaffolds.
@@ -23,6 +25,21 @@ class ScaffoldSplitter():
 
         # Get the sorted scaffold sets.
         scaffold_sets = self.generate_scaffolds(dataset)
+
+        # Balance scaffolds so that those larger than half of test or val go to train.
+        random = Random()
+        big_index_sets = []
+        small_index_sets = []
+        test_size = frac_test * len(dataset)
+        for index_set in list(scaffold_sets.values()):
+            # Test here will be split in half for final test and val.
+            if len(index_set) > test_size / 4:
+                big_index_sets.append(index_set)
+            else:
+                small_index_sets.append(index_set)
+        random.shuffle(big_index_sets)
+        random.shuffle(small_index_sets)
+        scaffold_sets = big_index_sets + small_index_sets
 
         # Generate the split indices for each dataset.
         train_cutoff = frac_train * len(dataset)
@@ -55,13 +72,7 @@ class ScaffoldSplitter():
                 scaffolds[scaffold] = [idx]
             else:
                 scaffolds[scaffold].append(idx)
-        
-        # Sort the scaffolds from largest to smallest scaffold sets.
-        scaffolds = {key: sorted(value) for key, value in scaffolds.items()}
-        scaffold_sets = [
-            scaffold_set for (_, scaffold_set) in sorted(scaffolds.items(),
-                key=lambda x: (len(x[1]), x[1][0]), reverse=True)
-        ]
+
         return scaffold_sets
 
     """
