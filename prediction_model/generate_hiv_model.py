@@ -112,22 +112,23 @@ Parameters:
     - num_opt_iters : The amount of iterations to optimize the hyperparameters for.
     - num_epochs : The number of epochs to train each model for.
     - loss_pos_weight : Amount to weigh the positive labels in loss function.
-    - pos_label : What to consider "positive" for F1 calculation.
+    - pos_label : What to consider "positive" for APS calculation.
 """
 def generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, torch_device,
                         train_loader, test_loader, num_opt_iters, num_epochs, loss_pos_weight,
                         pos_label):
     # Get the optimized hyperparameters for the models.
-    model_args, lr = get_optimized_hyperparameters(atom_dim, bond_dim, features_dim, torch_device, 
-                                                train_loader, test_loader, num_opt_iters, 
-                                                num_epochs // 2, loss_pos_weight, pos_label)
+    model_args, lr, clip = get_optimized_hyperparameters(atom_dim, bond_dim, features_dim, 
+                                                torch_device, train_loader, test_loader, 
+                                                num_opt_iters, num_epochs, loss_pos_weight, 
+                                                pos_label)
     
     # Generate the models.
     models = [
         create_prediction_model(model_args, atom_dim, bond_dim, features_dim, torch_device)
         for _ in range(ensemble_size)]
     
-    return models, lr
+    return models, lr, clip
 
 """
 Helper method for getting the path to a model's saved state dict.
@@ -152,9 +153,9 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
 
     # Generate the models.
     print("Initializing the HIV models...")
-    models, lr = generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, torch_device, 
-                                 train_loader, validation_loader, num_opt_iters, num_train_epochs, 
-                                 loss_pos_weight, 1)
+    models, lr, clip = generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, 
+                                 torch_device, train_loader, validation_loader, num_opt_iters, 
+                                 num_train_epochs, loss_pos_weight, 1)
     print("Done initializing the models.")
 
     if (use_full_dataset):
@@ -167,16 +168,16 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
         data_loader = ExtendedDataLoader(dataset, batch_size=batch_size, num_workers=4, pin_memory=True, 
                                          sampler=True)
         train_ensemble(models, num_train_epochs, data_loader, None, train_prediction_model,
-                       None, torch_device, loss_pos_weight, 1, lr)
+                       None, torch_device, loss_pos_weight, 1, lr, clip)
     else:
         # Train the ensembled models.
         print("Training the ensemble...")
         train_ensemble(models, num_train_epochs, train_loader, validation_loader, train_prediction_model,
-                    test_prediction_model, torch_device, loss_pos_weight, 1, lr)
+                    test_prediction_model, torch_device, loss_pos_weight, 1, lr, clip)
 
         # Test the ensembled model.
-        f1, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device, 1)
-        print("Results of final ensembled model: F1=" + str(f1) + ", ROC AUC=" + str(roc_auc))
+        aps, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device, 1)
+        print("Results of final ensembled model: APS=" + str(aps) + ", ROC AUC=" + str(roc_auc))
 
     # Save each of the models to the save path.
     for idx, model in enumerate(models):

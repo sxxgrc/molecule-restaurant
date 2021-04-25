@@ -4,7 +4,7 @@ from torch import nn
 
 from .directed_mpnn import DMPNNEncoder
 
-from sklearn.metrics import f1_score, roc_auc_score
+from sklearn.metrics import average_precision_score, roc_auc_score
 
 """
 The full classifier model which uses a D-MPNN model to create an embedding for the
@@ -31,9 +31,6 @@ class PredictionModel(nn.Module):
         # Activation function for the middle feed forward neural networks.
         relu = nn.ReLU(inplace=True).to(torch_device)
 
-        # Batch normalization.
-        bn = nn.BatchNorm1d(args.ffn_hidden_size)
-
         # Activation function for the final prediction computation.
         self.sigmoid = nn.Sigmoid().to(torch_device)
 
@@ -50,7 +47,7 @@ class PredictionModel(nn.Module):
 
             # Middle layers.
             for _ in range(args.num_ffn_layers - 2):
-                ffn.extend([bn, relu, dropout, 
+                ffn.extend([relu, dropout, 
                     nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size)])
             
             # Final layer.
@@ -132,7 +129,8 @@ def get_model_args_from_batch(extended_batch, torch_device):
 """
 Trains the prediction model for a given data loader.
 """
-def train_prediction_model(model, data_loader, criterion, torch_device, optimizer, scheduler, scaler):
+def train_prediction_model(model, data_loader, criterion, torch_device, optimizer, scheduler, 
+                           scaler, clip):
     # Train.
     model.train()
     torch.set_grad_enabled(True)
@@ -156,9 +154,8 @@ def train_prediction_model(model, data_loader, criterion, torch_device, optimize
 
         # Perform back propagation and optimization.
         scaler.scale(loss).backward()
-        nn.utils.clip_grad_value_(model.parameters(), clip_value=1.0)
+        nn.utils.clip_grad_value_(model.parameters(), clip_value=clip)
         loss_sum += loss.detach().item() # Get loss item after back propagation.
-        print("LOSS=" + str(loss.detach().item()))
         scaler.step(optimizer)
         original_scale = scaler.get_scale()
         scaler.update()
@@ -194,18 +191,17 @@ def get_predictions(model, data_loader, torch_device):
                           atom_incoming_bond_map, bond_reverse_map, num_bonds_per_atom,
                           num_atoms_per_mol).detach().cpu().numpy()
         y_pred += y_hat.tolist()
-        y_pred_labels += numpy.round(y_hat).tolist()
         y_true += true_y.detach().cpu().numpy().tolist()
-    return y_pred, y_pred_labels, y_true
+    return y_pred, y_true
 
 """
 Tests the prediction model on a given data loader.
 """
 def test_prediction_model(model, data_loader, torch_device, pos_label):
     # Get predictions.
-    y_pred, y_pred_labels, y_true = get_predictions(model, data_loader, torch_device)
+    y_pred, y_true = get_predictions(model, data_loader, torch_device)
 
     # Compute metrics.
-    f1 = f1_score(y_true, y_pred_labels, pos_label=pos_label)
+    aps = average_precision_score(y_true, y_pred, pos_label=pos_label)
     roc_auc = roc_auc_score(y_true, y_pred)
-    return f1, roc_auc
+    return aps, roc_auc
