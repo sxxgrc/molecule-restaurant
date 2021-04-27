@@ -77,10 +77,13 @@ def prepare_train_val_test_data(dataset, frac_train=0.8, frac_val=0.1, frac_test
         # Create datasets for the train and test data which normalize them.
         print("Creating train, validation, and test datasets and normalizing them...")
         train_dataset = MoleculeDataset(root=main_path, name="train", dataset=train_dataset)
-        validation_dataset = MoleculeDataset(root=main_path, name="val",
-                                             dataset=val_dataset)
-        test_dataset = MoleculeDataset(root=main_path, name="test", 
-                                       dataset=test_dataset)
+        molecule_scaler, bond_scaler, atom_scaler = train_dataset.get_scalers()
+        validation_dataset = MoleculeDataset(root=main_path, name="val", dataset=val_dataset, 
+                                             molecule_scaler=molecule_scaler, bond_scaler=bond_scaler, 
+                                             atom_scaler=atom_scaler)
+        test_dataset = MoleculeDataset(root=main_path, name="test", dataset=test_dataset,
+                                       molecule_scaler=molecule_scaler, bond_scaler=bond_scaler, 
+                                       atom_scaler=atom_scaler)
     else:
         # Get datasets.
         train_dataset = MoleculeDataset(root=main_path, name="train")
