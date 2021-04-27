@@ -60,26 +60,27 @@ Data preparation for the HIV dataset.
 
 Produces a train, validation, and test data loader, where the data is split by molecular scaffold similarity.
 """
-def prepare_train_val_test_data(dataset, frac_train=0.8, frac_test=0.2, batch_size=32):
+def prepare_train_val_test_data(dataset, frac_train=0.8, frac_val=0.1, frac_test=0.1, batch_size=32):
     # Check if train and test data already exist.
     main_path = str(Path().absolute()) + "/prediction_model/data/torch-geometric/hiv/normalized"
     train_path = main_path + "/train.pt"
     test_path = main_path + "/test.pt"
+    val_path = main_path + "/val.pt"
     if (not path.exists(train_path) or path.getsize(train_path) == 0) or (not path.exists(test_path)
-        or path.getsize(test_path) == 0):
+        or path.getsize(test_path) == 0) or (not path.exists(val_path) or path.getsize(val_path) == 0):
         # Split the dataset into train and test datasets by scaffold.
         print("Splitting the data...")
         scaffold_splitter = ScaffoldSplitter()
-        train_dataset, test_dataset = scaffold_splitter.split(dataset, frac_train, frac_test)
+        train_dataset, val_dataset, test_dataset = scaffold_splitter.split(dataset, frac_train, frac_val, frac_test)
         print("Finished splitting.")
 
         # Create datasets for the train and test data which normalize them.
         print("Creating train, validation, and test datasets and normalizing them...")
         train_dataset = MoleculeDataset(root=main_path, name="train", dataset=train_dataset)
         validation_dataset = MoleculeDataset(root=main_path, name="val",
-                                             dataset=test_dataset[:len(test_dataset) // 2])
+                                             dataset=val_dataset)
         test_dataset = MoleculeDataset(root=main_path, name="test", 
-                                       dataset=test_dataset[len(test_dataset) // 2:])
+                                       dataset=test_dataset)
     else:
         # Get datasets.
         train_dataset = MoleculeDataset(root=main_path, name="train")
@@ -108,6 +109,7 @@ Parameters:
     - features_dim : The dimension of the molecule features in the dataset.
     - torch_device : The device being used for PyTorch.
     - train_loader : Data loader containing the train dataset.
+    - validation_loader : Data loader containing the testing dataset.
     - test_loader : Data loader containing the test dataset.
     - num_opt_iters : The amount of iterations to optimize the hyperparameters for.
     - num_epochs : The number of epochs to train each model for.
@@ -115,12 +117,12 @@ Parameters:
     - pos_label : What to consider "positive" for APS calculation.
 """
 def generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, torch_device,
-                        train_loader, test_loader, num_opt_iters, num_epochs, loss_pos_weight,
-                        pos_label):
+                        train_loader, validation_loader, test_loader, num_opt_iters, num_epochs, 
+                        loss_pos_weight, pos_label):
     # Get the optimized hyperparameters for the models.
     model_args, lr, clip = get_optimized_hyperparameters(atom_dim, bond_dim, features_dim, 
-                                                torch_device, train_loader, test_loader, 
-                                                num_opt_iters, num_epochs, loss_pos_weight, 
+                                                torch_device, train_loader, validation_loader,
+                                                test_loader, num_opt_iters, num_epochs, loss_pos_weight, 
                                                 pos_label)
     
     # Generate the models.
@@ -154,7 +156,7 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
     # Generate the models.
     print("Initializing the HIV models...")
     models, lr, clip = generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, 
-                                 torch_device, train_loader, validation_loader, num_opt_iters, 
+                                 torch_device, train_loader, validation_loader, test_loader, num_opt_iters, 
                                  num_train_epochs, loss_pos_weight, 1)
     print("Done initializing the models.")
 

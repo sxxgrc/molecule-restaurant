@@ -17,11 +17,11 @@ class ScaffoldSplitter():
         self.scaffold_generator = scaffold_generator
     
     """
-    Splits the dataset into train and test datasets according to the percentages
+    Splits the dataset into train, validation, and test datasets according to the percentages
     provided.
     """
-    def split(self, dataset, frac_train, frac_test):
-        assert_almost_equal(frac_train + frac_test, 1.)
+    def split(self, dataset, frac_train, frac_val, frac_test):
+        assert_almost_equal(frac_train + frac_val + frac_test, 1.)
 
         # Get the sorted scaffold sets.
         scaffold_sets = self.generate_scaffolds(dataset)
@@ -31,9 +31,9 @@ class ScaffoldSplitter():
         big_index_sets = []
         small_index_sets = []
         test_size = frac_test * len(dataset)
-        for index_set in list(scaffold_sets.values()):
-            # Test here will be split in half for final test and val.
-            if len(index_set) > test_size / 4:
+        val_size = frac_val * len(dataset)
+        for index_set in scaffold_sets:
+            if len(index_set) > test_size / 2 or len(index_set) > val_size / 2:
                 big_index_sets.append(index_set)
             else:
                 small_index_sets.append(index_set)
@@ -42,18 +42,21 @@ class ScaffoldSplitter():
         scaffold_sets = big_index_sets + small_index_sets
 
         # Generate the split indices for each dataset.
-        train_cutoff = frac_train * len(dataset)
+        train_size = frac_train * len(dataset)
         train_indices = []
+        val_indices = []
         test_indices = []
 
         for scaffold_set in scaffold_sets:
-            if len(train_indices) + len(scaffold_set) > train_cutoff:
-                test_indices += scaffold_set
-            else:
+            if len(train_indices) + len(scaffold_set) <= train_size:
                 train_indices += scaffold_set
+            elif len(val_indices) + len(scaffold_set) <= val_size:
+                val_indices += scaffold_set
+            else:
+                test_indices += scaffold_set
 
         # Return the split datasets.
-        return dataset[train_indices], dataset[test_indices]
+        return dataset[train_indices], dataset[val_indices], dataset[test_indices]
     
     """
     Generates a list of lists containing the indices of each scaffold in the dataset.
@@ -72,8 +75,7 @@ class ScaffoldSplitter():
                 scaffolds[scaffold] = [idx]
             else:
                 scaffolds[scaffold].append(idx)
-
-        return scaffold_sets
+        return list(scaffolds.values())
 
     """
     Computes the scaffold for a molecule represented by the given SMILES string.

@@ -49,6 +49,7 @@ Parameters:
     - bond_dim : The dimension of the bond features in the dataset.
     - features_dim : The dimension of the molecule features in the dataset.
     - torch_device : The device being used for PyTorch.
+    - train_loader : Data loader containing the training dataset.
     - validation_loader : Data loader containing the validation dataset.
     - test_loader : Data loader containing the test dataset.
     - num_optimization_iters : The amount of iterations to optimize the hyperparameters for.
@@ -57,8 +58,8 @@ Parameters:
     - pos_label : What to consider "positive" for APS calculation.
 """
 def optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device, 
-                             train_loader, validation_loader, num_optimization_iters, num_epochs,
-                             loss_pos_weight, pos_label):
+                             train_loader, validation_loader, test_loader, num_optimization_iters, 
+                             num_epochs, loss_pos_weight, pos_label):
     print("Optimizing hyperparameters...")
 
     # Define the method to optimize.
@@ -85,11 +86,15 @@ def optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device,
         print("Learning Rate=" + str(lr))
         print("Clip=" + str(clip))
 
-        # Create, train, and test the models.
+        # Create, train, and validate the models.
         model = [create_prediction_model(hyper_args, atom_dim, bond_dim, features_dim, torch_device)]
         aps, roc_auc = train_ensemble(model, num_epochs, train_loader, validation_loader, train_prediction_model, 
                        test_prediction_model, torch_device, loss_pos_weight, pos_label, lr, clip)
-        print("Best results for model: APS=" + str(aps) + ", ROC AUC=" + str(roc_auc))
+        print("Best validation results for model: APS=" + str(aps) + ", ROC AUC=" + str(roc_auc))
+
+        # Test the model on the testing set.
+        aps_test, roc_auc_test = test_prediction_model(model[0], test_loader, torch_device, pos_label)
+        print("Results from testing for model: APS=" + str(aps_test) + ", ROC-AUC=" + str(roc_auc_test))
 
         # Return metric we will minimize for optimization.
         return -1 * roc_auc
@@ -142,13 +147,13 @@ def optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device,
 Gets the optimized hyperparameters for the full ensembled prediction model.
 """
 def get_optimized_hyperparameters(atom_dim, bond_dim, features_dim, torch_device, 
-                             train_loader, validation_loader, num_optimization_iters, num_epochs, 
-                             loss_pos_weight, pos_label):
+                             train_loader, validation_loader, test_loader, num_optimization_iters, 
+                             num_epochs, loss_pos_weight, pos_label):
     # Check if parameters are in file, creating them if not.
     if not path.exists(SAVE_PATH) or not path.getsize(SAVE_PATH) > 0:
         optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device,
-                                 train_loader, validation_loader, num_optimization_iters, num_epochs, 
-                                 loss_pos_weight, pos_label)
+                                 train_loader, validation_loader, test_loader, num_optimization_iters, 
+                                 num_epochs, loss_pos_weight, pos_label)
     
     # Load the parameters from the JSON file.
     with open(SAVE_PATH, "r") as json_file:
