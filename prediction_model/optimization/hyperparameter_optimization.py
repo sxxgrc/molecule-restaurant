@@ -101,7 +101,7 @@ def optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device,
 
     # Our model takes a while to run so use less number of random states for TPE algorithm.
     # Original value is 20.
-    n_startup_jobs = 10
+    n_startup_jobs = 11
     algo = partial(tpe.suggest, n_startup_jobs=n_startup_jobs)
 
     # Import any older trials we have run.

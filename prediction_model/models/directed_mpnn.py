@@ -35,16 +35,18 @@ class DMPNNEncoder(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
         # Batch normalization for training.
-        self.bn = nn.BatchNorm1d(args.hidden_size)
+        self.bn_i = nn.BatchNorm1d(args.hidden_size)
+        self.bn_m = nn.BatchNorm1d(args.hidden_size)
+        self.bn_a = nn.BatchNorm1d(args.hidden_size)
 
         # Input linear model W_i used to calculate h0.
-        self.W_i = nn.Linear(atom_dim + bond_dim, args.hidden_size)
+        self.W_i = nn.Linear(atom_dim + bond_dim, args.hidden_size, bias=False)
 
         # Inner hidden linear model W_m used to calculate h{t+1}.
-        self.W_m = nn.Linear(args.hidden_size, args.hidden_size)
+        self.W_m = nn.Linear(args.hidden_size, args.hidden_size, bias=False)
 
         # Output linear model W_a used to calculate h{v}, the molecular representation of the result.
-        self.W_a = nn.Linear(atom_dim + args.hidden_size, args.hidden_size)
+        self.W_a = nn.Linear(atom_dim + args.hidden_size, args.hidden_size, bias=False)
 
     """
     Computes the next bond message for the given last hidden state.
@@ -92,7 +94,7 @@ class DMPNNEncoder(nn.Module):
         edge_node_feat_mat = torch.cat((bond_features, expanded_x), dim=1).float()
 
         # Generate h_0 for each edge.
-        h_0 = self.relu(self.bn(self.W_i(edge_node_feat_mat)))
+        h_0 = self.relu(self.bn_i(self.W_i(edge_node_feat_mat)))
         h_t = h_0
 
         # Expand the atom to incoming bond map for all of the bonds in the dataset.
@@ -105,7 +107,7 @@ class DMPNNEncoder(nn.Module):
                                                  bond_incoming_bond_map, bond_reverse_map)
 
             # Compute the next hidden state for each edge.
-            h_t = self.relu(h_0 + self.bn(self.W_m(m_t)))
+            h_t = self.relu(h_0 + self.bn_m(self.W_m(m_t)))
 
             # Add dropout layer to not overtrain.
             h_t = self.dropout_layer(h_t)
@@ -117,12 +119,13 @@ class DMPNNEncoder(nn.Module):
 
         # Get the atom-wise representation of hidden states by concating node features to node messages.
         node_feat_message = torch.cat((atom_features, m_v), dim=1)
-        h_v = self.relu(self.bn(self.W_a(node_feat_message)))
+        h_v = self.relu(self.bn_a(self.W_a(node_feat_message)))
         h_v = self.dropout_layer(h_v)
 
         # Readout phase, which creates the molecule representation from the atom representations.
         molecule_chunks = torch.split(h_v, num_atoms_per_mol)
-        h = torch.stack([torch.sum(molecule_chunk, 0) for molecule_chunk in molecule_chunks])
+        h = torch.stack([torch.sum(molecule_chunk, 0) / molecule_chunk.shape[0] for 
+                         molecule_chunk in molecule_chunks])
 
         # Concatenate molecular representation with external features and output.
         final_representation = torch.cat((h, molecule_features), dim=1)
