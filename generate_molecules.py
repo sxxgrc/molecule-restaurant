@@ -20,6 +20,6 @@ device = torch.device(dev)
 print()
 print("Using PyTorch device : " + str(device))
 
-hiv_classifier = get_hiv_classifier(30, 5, device, 21, 512)
+hiv_classifier = get_hiv_classifier(30, 5, device, 30, 512)
 
 # For predicting molecules, always normalize the input data by the model's training dataset scaler.

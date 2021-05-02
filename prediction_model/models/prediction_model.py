@@ -35,7 +35,7 @@ class PredictionModel(nn.Module):
         self.sigmoid = nn.Sigmoid().to(torch_device)
 
         # Dropout layer to use for feed-forward neural networks.
-        dropout = nn.Dropout(args.ffn_dropout_prob).to(torch_device)
+        dropout = nn.Dropout(args.dropout_prob).to(torch_device)
 
         # The layers of feed-forward neural networks which will compute the property 
         # prediction from the embedding.
@@ -43,15 +43,15 @@ class PredictionModel(nn.Module):
             ffn = [dropout, nn.Linear(args.hidden_size + features_dim, 1)]
         else:
             # First layer.
-            ffn = [dropout, nn.Linear(args.hidden_size + features_dim, args.ffn_hidden_size)]
+            ffn = [dropout, nn.Linear(args.hidden_size + features_dim, args.hidden_size)]
 
             # Middle layers.
             for _ in range(args.num_ffn_layers - 2):
                 ffn.extend([relu, dropout, 
-                    nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size)])
+                    nn.Linear(args.hidden_size, args.hidden_size)])
             
             # Final layer.
-            ffn.extend([relu, dropout, nn.Linear(args.ffn_hidden_size, 1)])
+            ffn.extend([relu, dropout, nn.Linear(args.hidden_size, 1)])
         
         # Create final FFN model.
         self.ffn = nn.Sequential(*ffn).to(torch_device)

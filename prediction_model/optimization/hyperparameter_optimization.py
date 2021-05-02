@@ -24,14 +24,12 @@ SPACE = {
     "message_passing_depth": hp.quniform("message_passing_depth", low=2, high=6, q=1),
     "hidden_size": hp.quniform("hidden_size", low=400, high=2400, q=100),
     "num_ffn_layers": hp.quniform("num_ffn_layers", low=1, high=6, q=1),
-    "ffn_hidden_size": hp.quniform("ffn_hidden_size", low=400, high=2400, q=100),
-    "ffn_dropout_prob": hp.quniform("ffn_dropout_prob", low=0.0, high=0.4, q=0.05),
     "learning_rate": hp.loguniform("learning_rate", numpy.log(0.0001), numpy.log(0.01)),
     "clip": hp.quniform("clip", low=0.5, high=10.0, q=0.5)
 }
 
 # The integer parameters.
-INT_KEYS = ["message_passing_depth", "hidden_size", "num_ffn_layers", "ffn_hidden_size"]
+INT_KEYS = ["message_passing_depth", "hidden_size", "num_ffn_layers"]
 
 # Path of saved parameters JSON file.
 SAVE_PATH = (str(Path().absolute()) + 
@@ -69,7 +67,7 @@ def optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device,
             hyperparams[key] = int(hyperparams[key])
         
         # Generate model arguments from hyperparams.
-        hyper_args = ModelArgs(0, 0, 0, 0, 0, 0)
+        hyper_args = ModelArgs(0, 0, 0, 0)
         for key, value in hyperparams.items():
             if key != "learning_rate" and key != "clip":
                 setattr(hyper_args, key, value)
@@ -77,12 +75,10 @@ def optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device,
         clip = hyperparams["clip"]
         
         print("Trying following hyperparameters:")
-        print("MPNN Dropout Prob=" + str(hyper_args.dropout_prob))
+        print("Dropout Prob=" + str(hyper_args.dropout_prob))
         print("Message Passing Depth=" + str(hyper_args.message_passing_depth))
-        print("MPNN Hidden Size=" + str(hyper_args.hidden_size))
+        print("Hidden Size=" + str(hyper_args.hidden_size))
         print("Number of FFN Layers=" + str(hyper_args.num_ffn_layers))
-        print("FFN Hidden Size=" + str(hyper_args.ffn_hidden_size))
-        print("FFN Dropout Prob=" + str(hyper_args.ffn_dropout_prob))
         print("Learning Rate=" + str(lr))
         print("Clip=" + str(clip))
 
@@ -101,7 +97,7 @@ def optimize_hyperparameters(atom_dim, bond_dim, features_dim, torch_device,
 
     # Our model takes a while to run so use less number of random states for TPE algorithm.
     # Original value is 20.
-    n_startup_jobs = 11
+    n_startup_jobs = 20
     algo = partial(tpe.suggest, n_startup_jobs=n_startup_jobs)
 
     # Import any older trials we have run.
@@ -158,10 +154,13 @@ def get_optimized_hyperparameters(atom_dim, bond_dim, features_dim, torch_device
     # Load the parameters from the JSON file.
     with open(SAVE_PATH, "r") as json_file:
         hyper_params = json.load(json_file)
+
+        for key in INT_KEYS:
+            hyperparams[key] = int(hyperparams[key])
     
     # Generate the model arguments from stored parameters.
     model_args = ModelArgs(dropout_prob=0.0, message_passing_depth=3, hidden_size=300,
-        num_ffn_layers=2, ffn_hidden_size=300, ffn_dropout_prob=0.0)
+        num_ffn_layers=2)
     for key, value in hyper_params.items():
         if key != "learning_rate" and key != "clip":
             setattr(model_args, key, value)
