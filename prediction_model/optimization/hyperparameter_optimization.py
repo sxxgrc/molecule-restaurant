@@ -156,7 +156,7 @@ def get_optimized_hyperparameters(atom_dim, bond_dim, features_dim, torch_device
         hyper_params = json.load(json_file)
 
         for key in INT_KEYS:
-            hyperparams[key] = int(hyperparams[key])
+            hyper_params[key] = int(hyper_params[key])
     
     # Generate the model arguments from stored parameters.
     model_args = ModelArgs(dropout_prob=0.0, message_passing_depth=3, hidden_size=300,

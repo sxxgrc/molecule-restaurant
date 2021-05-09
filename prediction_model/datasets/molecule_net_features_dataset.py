@@ -144,7 +144,7 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
                 edge_index, edge_attr = edge_index[:, perm], edge_attr[perm]
 
             # Generate feature vector for molecule.
-            features = torch.as_tensor(features_generator(mol))
+            features = torch.as_tensor(features_generator (mol))
 
             # Create data item for this molecule.
             data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y,

@@ -37,5 +37,11 @@ pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-"${torch_ver
 pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-"${torch_version}"+"${cuda_version}".html
 pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-"${torch_version}"+"${cuda_version}".html
 pip install torch-geometric
+
+# Install requirements for molecule chef.
+conda install future six tqdm pandas
+pip install torchtext==0.3.1
+pip install -e submodules
+
 echo
 echo "Done!"

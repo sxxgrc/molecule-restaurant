@@ -166,7 +166,6 @@ def train_prediction_model(model, data_loader, criterion, torch_device, optimize
             scheduler.step()
     
     print("Post-training prediction model loss: " + str(loss_sum / len(data_loader)))
-    print()
 
 
 """

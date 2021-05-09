@@ -99,7 +99,7 @@ def test_ensemble(models, test_loader, prediction_func, torch_device, pos_label)
 
     # Iterate through each model and get predictions.
     for model in models:
-        y_pred, _, y_true = prediction_func(model, test_loader, torch_device)
+        y_pred, y_true = prediction_func(model, test_loader, torch_device)
 
         if summed_preds == None:
             summed_preds = numpy.array(y_pred)

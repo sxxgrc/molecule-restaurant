@@ -1,0 +1,6 @@
+[submodule "external_models/molecule-chef"]
+	path = external_models/molecule-chef
+	url = https://github.com/sxxgrc/molecule-chef.git
+[submodule "external_models/MolecularTransformer"]
+	path = external_models/MolecularTransformer
+	url = https://github.com/pschwllr/MolecularTransformer.git
