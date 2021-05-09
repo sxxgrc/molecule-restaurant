@@ -34,7 +34,7 @@ class HIVClassifier(nn.Module):
     """
     def forward(self, atom_features, bond_features, bond_index, molecule_features,
                 atom_incoming_bond_map, bond_reverse_map, num_bonds_per_atom, num_atoms_per_mol):
-        predictions = None
+        predictions = numpy.array()
 
         # Get predictions for each model.
         for model in self.models:
@@ -43,7 +43,7 @@ class HIVClassifier(nn.Module):
                            atom_incoming_bond_map, bond_reverse_map, num_bonds_per_atom, 
                            num_atoms_per_mol).detach().numpy()
 
-            if predictions == None:
+            if len(summed_preds) == 0:
                 predictions = numpy.array(y_pred)
             else:
                 predictions += y_pred

@@ -38,10 +38,22 @@ pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-"${torch_ve
 pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-"${torch_version}"+"${cuda_version}".html
 pip install torch-geometric
 
+# Init submodules.
+git submodule update --init --recursive
+git submodule update --recursive
+
 # Install requirements for molecule chef.
+pip3 install -r external_models/molecule-chef/requirements.txt
+unzip external_models/molecule-chef/data.zip -d external_models/molecule-chef/
+source external_models/molecule-chef/set_up.sh
+pip install git+https://github.com/PatWalters/rd_filters.git
+
+# Install requirements for molecule transformer.
 conda install future six tqdm pandas
 pip install torchtext==0.3.1
-pip install -e submodules
+pip install -e external_models/MolecularTransformer
+pip install gdown
+gdown https://drive.google.com/u/0/uc?id=1ogXzAg71BOs9SBrVt-umgcdc1_0ijUvU
 
 echo
 echo "Done!"
