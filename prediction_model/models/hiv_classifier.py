@@ -1,7 +1,5 @@
 import numpy
 
-from torch import nn
-
 """
 The full HIV replication inhibition classifier model.
 This model is built from an ensemble of PredictionModel objects which were trained on HIV replication
@@ -10,15 +8,14 @@ Note that this model is built from other trained models, so this model does not 
 
 Predicts whether a molecule will inhibit HIV replication (0) or not (1).
 """
-class HIVClassifier(nn.Module):
+class HIVClassifier():
     """
     Initializes an object instance of an HIVClassifier model.
 
     Parameters:
         - models: The set of models to use in an ensembled form for the prediction.
     """
-    def __init__(self, models):
-        super(HIVClassifier, self).__init__()
+    def __init__(self, models, molecule_scaler, bond_scaler, atom_scaler, torch_device):
         self.models = models
     
     """
@@ -32,7 +29,7 @@ class HIVClassifier(nn.Module):
         - num_bonds_per_atom : List containing the number of bonds for each atom.
         - num_atoms_per_mol : List containing the number of atoms for each molecule.
     """
-    def forward(self, atom_features, bond_features, bond_index, molecule_features,
+    def predict(self, atom_features, bond_features, bond_index, molecule_features,
                 atom_incoming_bond_map, bond_reverse_map, num_bonds_per_atom, num_atoms_per_mol):
         predictions = numpy.array()
 

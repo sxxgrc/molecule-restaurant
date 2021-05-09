@@ -221,4 +221,4 @@ def get_hiv_classifier(num_train_epochs, ensemble_size, torch_device, num_opt_it
         model.load_state_dict(torch.load(get_model_state_dict_path(idx)))
 
     # Create HIV classifier model object and return.
-    return HIVClassifier(models, molecule_scaler, bond_scaler, atom_scaler).to(torch_device)
+    return HIVClassifier(models, molecule_scaler, bond_scaler, atom_scaler, torch_device).to(torch_device)

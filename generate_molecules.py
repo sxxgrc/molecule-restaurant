@@ -96,7 +96,7 @@ with open(molecule_chef_metrics_path, "w") as f:
 with open(smiles_path, "r") as molecules_file, open(qed_path, "w") as qed_file, open(hiv_path, "w") as hiv_file:
     for molecule_smiles in molecules_file:
         # Compute metrics.
-        hiv_result = hiv_classifier(molecule_smiles)
+        hiv_result = hiv_classifier.predict(molecule_smiles)
         molecule = Chem.MolFromSmiles(molecule_smiles)
         qed_result = Chem.QED.qed(molecule)
 
