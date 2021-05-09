@@ -26,6 +26,11 @@ from prediction_model.models import (
 # The path for the saved model.
 SAVE_PATH = str(Path().absolute()) + "/prediction_model/trained_models/"
 
+# The normalization scalers to use for the final model.
+molecule_scaler = None 
+bond_scaler = None 
+atom_scaler = None
+
 """
 Gets the data for training the HIV model.
 
@@ -61,6 +66,8 @@ Data preparation for the HIV dataset.
 Produces a train, validation, and test data loader, where the data is split by molecular scaffold similarity.
 """
 def prepare_train_val_test_data(dataset, frac_train=0.8, frac_val=0.1, frac_test=0.1, batch_size=32):
+    global molecule_scaler, bond_scaler, atom_scaler
+
     # Check if train and test data already exist.
     main_path = str(Path().absolute()) + "/prediction_model/data/torch-geometric/hiv/normalized"
     train_path = main_path + "/train.pt"
@@ -90,6 +97,7 @@ def prepare_train_val_test_data(dataset, frac_train=0.8, frac_val=0.1, frac_test
         train_dataset = MoleculeDataset(root=main_path, name="train")
         validation_dataset = MoleculeDataset(root=main_path, name="val")
         test_dataset = MoleculeDataset(root=main_path, name="test")
+        molecule_scaler, bond_scaler, atom_scaler = train_dataset.get_scalers()
 
     # Create data loaders for train, validation, and test data.
     train_loader = ExtendedDataLoader(train_dataset, sampler=True, batch_size=batch_size, 
@@ -155,8 +163,7 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
 
     if final:
         train_loader, validation_loader, test_loader = (
-            prepare_train_val_test_data(data, frac_train=0.95, frac_val=0.05, frac_test=0, batch_size=batch_size)
-        )
+            prepare_train_val_test_data(data, frac_train=0.9, frac_val=0.1, frac_test=0, batch_size=batch_size))
     else:
         train_loader, validation_loader, test_loader = prepare_train_val_test_data(data, batch_size=batch_size)
 
@@ -214,4 +221,4 @@ def get_hiv_classifier(num_train_epochs, ensemble_size, torch_device, num_opt_it
         model.load_state_dict(torch.load(get_model_state_dict_path(idx)))
 
     # Create HIV classifier model object and return.
-    return HIVClassifier(models).to(torch_device)
+    return HIVClassifier(models, molecule_scaler, bond_scaler, atom_scaler).to(torch_device)
