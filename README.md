@@ -11,3 +11,6 @@ run ./setup_molecule_restaurant.sh
 
 
 if broken pipe from hyperparameter optimization just restart, cancel with ctrl c and start again
+
+
+explain difference in testing vs final

@@ -81,9 +81,10 @@ def prepare_train_val_test_data(dataset, frac_train=0.8, frac_val=0.1, frac_test
         validation_dataset = MoleculeDataset(root=main_path, name="val", dataset=val_dataset, 
                                              molecule_scaler=molecule_scaler, bond_scaler=bond_scaler, 
                                              atom_scaler=atom_scaler)
-        test_dataset = MoleculeDataset(root=main_path, name="test", dataset=test_dataset,
-                                       molecule_scaler=molecule_scaler, bond_scaler=bond_scaler, 
-                                       atom_scaler=atom_scaler)
+        if frac_test > 0:
+            test_dataset = MoleculeDataset(root=main_path, name="test", dataset=test_dataset,
+                                           molecule_scaler=molecule_scaler, bond_scaler=bond_scaler, 
+                                           atom_scaler=atom_scaler)
     else:
         # Get datasets.
         train_dataset = MoleculeDataset(root=main_path, name="train")
@@ -91,13 +92,14 @@ def prepare_train_val_test_data(dataset, frac_train=0.8, frac_val=0.1, frac_test
         test_dataset = MoleculeDataset(root=main_path, name="test")
 
     # Create data loaders for train, validation, and test data.
-    # Use half of test dataset for validation and other for testing.
     train_loader = ExtendedDataLoader(train_dataset, sampler=True, batch_size=batch_size, 
                                       num_workers=4, pin_memory=True)
     validation_loader = ExtendedDataLoader(validation_dataset, batch_size=batch_size,
                                            num_workers=4, pin_memory=True)
-    test_loader = ExtendedDataLoader(test_dataset, batch_size=batch_size, 
-                                     num_workers=4, pin_memory=True)
+    test_loader = None
+    if frac_test > 0:
+        test_loader = ExtendedDataLoader(test_dataset, batch_size=batch_size, 
+                                         num_workers=4, pin_memory=True)
     return train_loader, validation_loader, test_loader
 
 """
@@ -144,14 +146,19 @@ def get_model_state_dict_path(model_idx):
 """
 Main method for generating the fully trained HIV classifier.
 """
-def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_iters, 
-                        batch_size, use_full_dataset=False):
+def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_iters, batch_size, final):
     print()
     print("Generating a new HIV replication inhibition classifier. Mind the noise!")
 
     # Prepare the train and test data.
     data, loss_pos_weight, atom_dim, bond_dim, features_dim = get_data()
-    train_loader, validation_loader, test_loader = prepare_train_val_test_data(data, batch_size=batch_size)
+
+    if final:
+        train_loader, validation_loader, test_loader = (
+            prepare_train_val_test_data(data, frac_train=0.95, frac_val=0.05, frac_test=0, batch_size=batch_size)
+        )
+    else:
+        train_loader, validation_loader, test_loader = prepare_train_val_test_data(data, batch_size=batch_size)
 
     # Convert loss pos weight to tensor.
     loss_pos_weight = torch.tensor(loss_pos_weight, device=torch_device)
@@ -163,23 +170,12 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
                                  num_train_epochs, loss_pos_weight, 1)
     print("Done initializing the models.")
 
-    if (use_full_dataset):
-        # Train ensembled models on full dataset.
-        # TODO: Maybe use a small amount of data for validation to select best epoch.
-        print("Training the ensemble on full dataset...")
-        dataset = MoleculeDataset(root=str(Path().absolute()) + 
-                                  "/prediction_model/data/torch-geometric/hiv/normalized", name="full", 
-                                  dataset=data)
-        data_loader = ExtendedDataLoader(dataset, batch_size=batch_size, num_workers=4, pin_memory=True, 
-                                         sampler=True)
-        train_ensemble(models, num_train_epochs, data_loader, None, train_prediction_model,
-                       None, torch_device, loss_pos_weight, 1, lr, clip)
-    else:
-        # Train the ensembled models.
-        print("Training the ensemble...")
-        train_ensemble(models, num_train_epochs, train_loader, validation_loader, train_prediction_model,
-                    test_prediction_model, torch_device, loss_pos_weight, 1, lr, clip)
+    # Train the ensembled models.
+    print("Training the ensemble...")
+    train_ensemble(models, num_train_epochs, train_loader, validation_loader, train_prediction_model,
+                test_prediction_model, torch_device, loss_pos_weight, 1, lr, clip)
 
+    if not final:
         # Test the ensembled model.
         aps, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device, 1)
         print("Results of final ensembled model: APS=" + str(aps) + ", ROC AUC=" + str(roc_auc))
@@ -198,16 +194,14 @@ Parameters:
     - torch_device : The PyTorch device used for the models.
     - num_opt_iters : The amount of iterations to optimize the hyperparameters for.
     - batch_size : The size of the batches to use for the dataset.
-    - use_full_dataset : Whether to train the models on the full dataset or not.
+    - final : Whether this is the final version of the model or not.
 """
-def get_hiv_classifier(num_train_epochs, ensemble_size, torch_device, num_opt_iters, 
-                       batch_size, use_full_dataset=False):
+def get_hiv_classifier(num_train_epochs, ensemble_size, torch_device, num_opt_iters, batch_size, final=False):
     # Check if all of the models for ensemble exist, if not create all of them.
     for model_idx in range(ensemble_size):
         model_path = get_model_state_dict_path(model_idx)
         if not path.exists(model_path) or not path.getsize(model_path) > 0:
-            generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_iters, 
-                                batch_size, use_full_dataset)
+            generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_iters, batch_size, final)
             break
 
     # Initialize models. Everything should exist already so don't need data loaders.
