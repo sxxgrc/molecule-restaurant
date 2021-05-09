@@ -95,7 +95,7 @@ Parameters:
     - pos_label : What to consider "positive" for APS calculation.
 """
 def test_ensemble(models, test_loader, prediction_func, torch_device, pos_label):
-    summed_preds = numpy.array()
+    summed_preds = numpy.array([])
 
     # Iterate through each model and get predictions.
     for model in models:

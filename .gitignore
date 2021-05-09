@@ -1,3 +1,5 @@
 .DS_Store
 .vscode/
 out
+molecular_transformer_weights.pt
+setup_log

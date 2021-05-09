@@ -59,8 +59,8 @@ This object provides the following additional values:
 class ExtendedBatch():
     def __init__(self, torch_geometric_batch):
         self.batch = torch_geometric_batch
-        self.atom_incoming_bond_map = self.get_atom_incoming_bond_map(self.batch.x, self.batch.edge_index)
-        self.bond_reverse_map = self.get_bond_reverse_map(self.batch.edge_index)
+        self.atom_incoming_bond_map = get_atom_incoming_bond_map(self.batch.x, self.batch.edge_index)
+        self.bond_reverse_map = get_bond_reverse_map(self.batch.edge_index)
 
         # Convert count tensors into lists.
         self.batch.num_bonds_per_atom = self.batch.num_bonds_per_atom.tolist()
