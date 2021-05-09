@@ -2,7 +2,7 @@
 Primary script for MoleculeRestaurant to generate molecules.
 """
 
-import torch, subprocess, json, os
+import torch, subprocess, json, os, numpy
 
 from pathlib import Path
 
@@ -94,14 +94,23 @@ with open(molecule_chef_metrics_path, "w") as f:
 
 # Compute QED and HIV metrics.
 with open(smiles_path, "r") as molecules_file, open(qed_path, "w") as qed_file, open(hiv_path, "w") as hiv_file:
+    smiles = []
+    hiv_results = []
+    qed_results = []
     for molecule_smiles in molecules_file:
-        # Compute metrics.
-        hiv_result = hiv_classifier.predict(molecule_smiles)
-        molecule = Chem.MolFromSmiles(molecule_smiles)
-        qed_result = Chem.QED.qed(molecule)
+        smiles.append(molecule_smiles)
 
-        # Write to files.
-        qed_file.write(molecule_smiles + " " + str(qed_result) + "\n")
-        hiv_file.write(molecule_smiles + " " + str(hiv_result) + "\n")
+        # Compute metrics.
+        hiv_results.append(hiv_classifier.predict(molecule_smiles))
+        molecule = Chem.MolFromSmiles(molecule_smiles)
+        qed_results.append(Chem.QED.qed(molecule))
+
+    # Sort the metrics and output to respective files.
+    hiv_sort_indices = numpy.argsort(hiv_results)[::-1]
+    qed_sort_indices = numpy.argsort(qed_results)
+
+    for idx in range(len(smiles)):
+        hiv_file.write(smiles[hiv_sort_indices[idx]] + " " + str(hiv_results[hiv_sort_indices[idx]]) + "\n")
+        qed_file.write(smiles[qed_sort_indices[idx]] + " " + str(qed_results[qed_sort_indices[idx]]) + "\n")
 
 print("Done!")
