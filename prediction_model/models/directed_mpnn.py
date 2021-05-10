@@ -89,33 +89,37 @@ class DMPNNEncoder(nn.Module):
     """
     def forward(self, atom_features, bond_features, bond_origins, molecule_features, atom_incoming_bond_map,
                 bond_reverse_map, num_bonds_per_atom, num_atoms_per_mol):
-        # Concatenate the edge feature matrix with the node feature matrix (edge vw concats with node v).
-        expanded_x = torch.index_select(atom_features, 0, bond_origins)
-        edge_node_feat_mat = torch.cat((bond_features, expanded_x), dim=1).float()
+        if (bond_features.shape[0] > 0):
+            # Concatenate the edge feature matrix with the node feature matrix (edge vw concats with node v).
+            expanded_x = torch.index_select(atom_features, 0, bond_origins)
+            edge_node_feat_mat = torch.cat((bond_features, expanded_x), dim=1).float()
 
-        # Generate h_0 for each edge.
-        h_0 = self.relu(self.bn_i(self.W_i(edge_node_feat_mat)))
-        h_t = h_0
+            # Generate h_0 for each edge.
+            h_0 = self.relu(self.bn_i(self.W_i(edge_node_feat_mat)))
+            h_t = h_0
 
-        # Expand the atom to incoming bond map for all of the bonds in the dataset.
-        bond_incoming_bond_map = torch.index_select(atom_incoming_bond_map, 0, bond_origins)
+            # Expand the atom to incoming bond map for all of the bonds in the dataset.
+            bond_incoming_bond_map = torch.index_select(atom_incoming_bond_map, 0, bond_origins)
 
-        # Message passing phase.
-        for _ in range(self.message_passing_depth):
-            # Compute the next message for each edge.
-            m_t = self.compute_next_bond_message(h_t, atom_incoming_bond_map.shape[1], 
-                                                 bond_incoming_bond_map, bond_reverse_map)
+            # Message passing phase.
+            for _ in range(self.message_passing_depth):
+                # Compute the next message for each edge.
+                m_t = self.compute_next_bond_message(h_t, atom_incoming_bond_map.shape[1], 
+                                                    bond_incoming_bond_map, bond_reverse_map)
 
-            # Compute the next hidden state for each edge.
-            h_t = self.relu(h_0 + self.bn_m(self.W_m(m_t)))
+                # Compute the next hidden state for each edge.
+                h_t = self.relu(h_0 + self.bn_m(self.W_m(m_t)))
 
-            # Add dropout layer to not overtrain.
-            h_t = self.dropout_layer(h_t)
+                # Add dropout layer to not overtrain.
+                h_t = self.dropout_layer(h_t)
 
-        # Get atom-wise representation of messages. Some atoms have 0 bonds so we deal with that as well.
-        atom_chunks = torch.split(h_t, num_bonds_per_atom)
-        m_v = torch.stack([torch.sum(atom_chunk, 0) if atom_chunk.numel() else 
-                              self.cached_zero_vector for atom_chunk in atom_chunks])
+            # Get atom-wise representation of messages. Some atoms have 0 bonds so we deal with that as well.
+            atom_chunks = torch.split(h_t, num_bonds_per_atom)
+            m_v = torch.stack([torch.sum(atom_chunk, 0) if atom_chunk.numel() else 
+                                self.cached_zero_vector for atom_chunk in atom_chunks])
+        else:
+            m_v = (torch.as_tensor([0], device=self.torch_device, dtype=torch.float)
+                        .expand(atom_features.shape[0], self.cached_zero_vector.shape[0]))
 
         # Get the atom-wise representation of hidden states by concating node features to node messages.
         node_feat_message = torch.cat((atom_features, m_v), dim=1)

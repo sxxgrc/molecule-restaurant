@@ -1,10 +1,12 @@
-import torch
+import torch, pickle
 
 from torch_geometric.data import InMemoryDataset, Data
 
 from chemprop.data import StandardScaler
 
 from numpy import vstack
+
+from os import path
 
 """
 Generic molecule dataset which serves to hold subsets of a MoleculeNetFeaturesDataset.
@@ -41,10 +43,65 @@ class MoleculeDataset(InMemoryDataset):
     def processed_file_names(self):
         return self.name + ".pt"
 
+    @property
+    def scalers_file_paths(self):
+        base_path = self.root + "/"
+        return {"molecule": base_path + "molecule_scaler.pkl", "bond": base_path + "bond_scaler.pkl",
+                "atom": base_path + "atom_scaler.pkl"}
+
+    """
+    Generates the molecule, bond, and atom scalers for the dataset.
+    """
+    def generate_scalers(self):
+        print("Creating new molecule, atom, and bond scalers for dataset.")
+
+        # Get all data features for normalization.
+        all_molecule_features = []
+        all_atom_features = []
+        all_bond_features = []
+        for d in self.dataset:
+            all_molecule_features.append(d.features)
+            all_atom_features += d.x
+            all_bond_features += d.edge_attr
+        
+        # Generate and save molecule feature scaler for data.
+        molecule_scaler = StandardScaler(replace_nan_token=0)
+        molecule_scaler.fit(vstack(all_molecule_features))
+        self.molecule_scaler = molecule_scaler
+        with open(self.scalers_file_paths["molecule"], "wb") as f:
+            pickle.dump(molecule_scaler, f, pickle.HIGHEST_PROTOCOL)
+
+        # Generate and save atom feature scaler for data.
+        atom_scaler = StandardScaler(replace_nan_token=0)
+        atom_scaler.fit(vstack(all_atom_features))
+        self.atom_scaler = atom_scaler
+        with open(self.scalers_file_paths["atom"], "wb") as f:
+            pickle.dump(atom_scaler, f, pickle.HIGHEST_PROTOCOL)
+
+        # Generate and save bond feature scaler for data.
+        bond_scaler = StandardScaler(replace_nan_token=0)
+        bond_scaler.fit(vstack(all_bond_features))
+        self.bond_scaler = bond_scaler
+        with open(self.scalers_file_paths["bond"], "wb") as f:
+            pickle.dump(bond_scaler, f, pickle.HIGHEST_PROTOCOL)
+
     """
     Gets the scalers being used by this dataset.
     """
     def get_scalers(self):
+        # If any of the scalers are None they must all be None so we create them.
+        if self.molecule_scaler is None:
+            if (not path.exists(self.scalers_file_paths["molecule"]) 
+                or not path.getsize(self.scalers_file_paths["molecule"]) > 0):
+                self.generate_scalers()
+            else:
+                with open(self.scalers_file_paths["molecule"], 'rb') as input:
+                    self.molecule_scaler = pickle.load(input)
+                with open(self.scalers_file_paths["bond"], 'rb') as input:
+                    self.bond_scaler = pickle.load(input)
+                with open(self.scalers_file_paths["atom"], 'rb') as input:
+                    self.atom_scaler = pickle.load(input)
+            
         return self.molecule_scaler, self.bond_scaler, self.atom_scaler
     
     """
@@ -58,31 +115,7 @@ class MoleculeDataset(InMemoryDataset):
     def process(self):
         # If any of the scalers are None they must all be None so we create them.
         if self.molecule_scaler is None:
-            print("Creating new molecule, atom, and bond scalers for dataset.")
-
-            # Get all data features for normalization.
-            all_molecule_features = []
-            all_atom_features = []
-            all_bond_features = []
-            for d in self.dataset:
-                all_molecule_features.append(d.features)
-                all_atom_features += d.x
-                all_bond_features += d.edge_attr
-            
-            # Normalize the molecule features in the data.
-            molecule_scaler = StandardScaler(replace_nan_token=0)
-            molecule_scaler.fit(vstack(all_molecule_features))
-            self.molecule_scaler = molecule_scaler
-
-            # Normalize the atom features in the data.
-            atom_scaler = StandardScaler(replace_nan_token=0)
-            atom_scaler.fit(vstack(all_atom_features))
-            self.atom_scaler = atom_scaler
-
-            # Normalize the edge features in the data.
-            bond_scaler = StandardScaler(replace_nan_token=0)
-            bond_scaler.fit(vstack(all_bond_features))
-            self.bond_scaler = bond_scaler
+            self.generate_scalers()
 
         # Generate output dataset.
         data_list = []

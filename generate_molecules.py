@@ -2,7 +2,7 @@
 Primary script for MoleculeRestaurant to generate molecules.
 """
 
-import torch, subprocess, json, os, numpy
+import torch, subprocess, json, os, numpy, importlib
 
 from pathlib import Path
 
@@ -10,7 +10,7 @@ from prediction_model import get_hiv_classifier
 
 from rdkit import Chem
 
-molecule_chef_train = __import__("external_models.molecule-chef.scripts.train")
+molecule_chef_train = importlib.import_module("external_models.molecule-chef.scripts.train")
 
 # Grab the device to use for the training.
 if torch.cuda.is_available():
@@ -24,18 +24,18 @@ print("Using PyTorch device : " + str(device))
 
 # Generate the HIV classifier model.
 print("Generating HIV replication inhibition predictor model...")
-hiv_classifier = get_hiv_classifier(num_train_epochs=30, ensemble_size=3, torch_device=device, 
-                                    num_opt_iters=50, batch_size=512)
+hiv_classifier = get_hiv_classifier(num_train_epochs=15, ensemble_size=3, torch_device=device, 
+                                    num_opt_iters=50, batch_size=512, final=False)
 print("Done!")
 print()
-
 exit
 
 # Generate and train the molecule chef model which will select reactants for generating molecules.
 print("Generating the Molecule Chef model for creating reactants...")
-subprocess.run(["python", "external_models/molecule-chef/scripts/prepare_data/prepare_datasets.py"])
+# subprocess.run(["python", "external_models/molecule-chef/scripts/prepare_data/prepare_datasets.py"])
 molecule_chef_train.train_molecule_chef_qed_hiv(hiv_classifier, predictor_label_to_optimize=0)
-best_molecule_chef_weights = str(Path().absolute()) + "/external_models/molecule-chef/scripts/train/chkpts/model_best.pth.pick"
+best_molecule_chef_weights = (str(Path().absolute()) + 
+                              "/external_models/molecule-chef/scripts/train/chkpts/model_best.pth.pick")
 print("Done!")
 print()
 

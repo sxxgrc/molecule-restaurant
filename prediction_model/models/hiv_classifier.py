@@ -4,7 +4,9 @@ from rdkit import Chem
 
 from chemprop.features import rdkit_2d_normalized_features_generator as features_generator
 
-from prediction_model.datasets import generate_atom_features, generate_bond_features
+from prediction_model.datasets.molecule_net_features_dataset import (
+    generate_atom_features, generate_bond_features
+)
 
 from prediction_model.dataloaders import get_bond_reverse_map, get_atom_incoming_bond_map
 
@@ -12,9 +14,8 @@ from prediction_model.dataloaders import get_bond_reverse_map, get_atom_incoming
 The full HIV replication inhibition classifier model.
 This model is built from an ensemble of PredictionModel objects which were trained on HIV replication
 inhibition data.
-Note that this model is built from other trained models, so this model does not need to be trained.
 
-Predicts whether a molecule will inhibit HIV replication (0) or not (1).
+Predicts probability that a molecule will not inhibit HIV replication.
 """
 class HIVClassifier():
     """
@@ -48,9 +49,9 @@ class HIVClassifier():
         - atom_incoming_bond_map : Tensor mapping each atom to the indices of its incoming bonds.
         - bond_reverse_map : Tensor mapping each bond to the index of its reverse.
     """
-    def convert_to_input(molecule_smiles):
+    def convert_to_input(self, molecule_smiles):
         # Convert SMILES to actual molecule.
-        mol = Chem.MolFromSmiles(smiles)
+        mol = Chem.MolFromSmiles(molecule_smiles)
 
         # Get atom features.
         atom_features, num_atoms = generate_atom_features(mol)
@@ -63,7 +64,7 @@ class HIVClassifier():
         atom_features = torch.stack(xs).to(self.torch_device)
 
         # Get bond features.
-        bond_index, bond_features, num_bonds_per_atom = generate_bond_features(mol)
+        bond_index, bond_features, num_bonds_per_atom = generate_bond_features(mol, atom_features)
         bond_origins = bond_index[0].to(self.torch_device)
         num_bonds_per_atom = num_bonds_per_atom.tolist()
 
@@ -72,10 +73,13 @@ class HIVClassifier():
         for edge_attr in bond_features:
             edge_attrs.append(torch.as_tensor(self.bond_scaler.transform(edge_attr.reshape(1, -1)[0]), 
                              dtype=torch.long))
-        bond_features = torch.stack(edge_attrs).to(self.torch_device)
+        if len(edge_attrs) > 0:
+            bond_features = torch.stack(edge_attrs).to(self.torch_device)
+        else:
+            bond_features = torch.tensor([]).to(self.torch_device)
 
         # Get molecule features.
-        molecule_features = torch.as_tensor(features_generator(mol))
+        molecule_features = torch.as_tensor(features_generator(molecule_smiles))
 
         # Normalize the molecule features.
         molecule_features = torch.as_tensor(self.molecule_scaler.transform(molecule_features.reshape(1, -1)[0]),
@@ -101,7 +105,7 @@ class HIVClassifier():
     """
     def predict(self, molecule_smiles):
         # Convert the molecule into the desired arguments.
-        model_args = convert_to_input(molecule_smiles)
+        model_args = self.convert_to_input(molecule_smiles)
 
         # Get predictions for each model.
         prediction = 0

@@ -16,7 +16,7 @@ fi
 echo "Creating conda environment, this will take a while..."
 conda install -y pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c nvidia >setup_log 2>&1
 conda install -y pip >>setup_log 2>&1
-conda install -y -c conda-forge rdkit >>setup_log 2>&1
+conda install -y -c rdkit rdkit >>setup_log 2>&1
 pip install git+https://github.com/bp-kelley/descriptastorus >>setup_log 2>&1
 pip install chemprop >>setup_log 2>&1
 
@@ -40,6 +40,13 @@ pip install torch-geometric >>setup_log 2>&1
 # Init submodules.
 git submodule update --init --recursive >>setup_log 2>&1
 git submodule update --recursive >>setup_log 2>&1
+unzip -o external_models/molecule-chef/data.zip -d external_models/molecule-chef/ >>setup_log 2>&1
+pip install gdown >>setup_log 2>&1
+gdown https://drive.google.com/u/0/uc?id=1ogXzAg71BOs9SBrVt-umgcdc1_0ijUvU >>setup_log 2>&1
+
+
+
+
 
 # Install requirements for molecule chef.
 pip3 install --no-deps -r external_models/molecule-chef/requirements.txt >>setup_log 2>&1
@@ -47,15 +54,13 @@ pip install dataclasses >>setup_log 2>&1
 conda install -y -c intel mkl_random >>setup_log 2>&1
 conda install -y -c intel mkl_fft >>setup_log 2>&1
 pip install tensorflow >>setup_log 2>&1
-unzip -o external_models/molecule-chef/data.zip -d external_models/molecule-chef/ >>setup_log 2>&1
-source external_models/molecule-chef/set_up.sh >>setup_log 2>&1
+
 pip install git+https://github.com/PatWalters/rd_filters.git >>setup_log 2>&1
 
 # Install requirements for molecule transformer.
 conda install -y future six tqdm pandas >>setup_log 2>&1
 pip install torchtext==0.3.1 >>setup_log 2>&1
 pip install -e external_models/MolecularTransformer >>setup_log 2>&1
-pip install gdown >>setup_log 2>&1
-gdown https://drive.google.com/u/0/uc?id=1ogXzAg71BOs9SBrVt-umgcdc1_0ijUvU >>setup_log 2>&1
+
 
 echo "Done!"

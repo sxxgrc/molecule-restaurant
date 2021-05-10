@@ -9,7 +9,6 @@ from pathlib import Path
 
 from os import path
 
-from prediction_model.datasets import MoleculeNetFeaturesDataset, MoleculeDataset
 from prediction_model.dataloaders import ExtendedDataLoader
 from prediction_model.splitters import ScaffoldSplitter
 from prediction_model.optimization import get_optimized_hyperparameters
@@ -26,10 +25,8 @@ from prediction_model.models import (
 # The path for the saved model.
 SAVE_PATH = str(Path().absolute()) + "/prediction_model/trained_models/"
 
-# The normalization scalers to use for the final model.
-molecule_scaler = None 
-bond_scaler = None 
-atom_scaler = None
+# Path for datasets.
+DATASET_PATH = str(Path().absolute()) + "/prediction_model/data/torch-geometric/hiv/normalized"
 
 """
 Gets the data for training the HIV model.
@@ -42,6 +39,8 @@ Returns:
     - features_dim : The dimension of the molecule features in the dataset.
 """
 def get_data():
+    from prediction_model.datasets.molecule_net_features_dataset import MoleculeNetFeaturesDataset
+
     # Data path to store the dataset to train on.
     data_path = str(Path().absolute()) + "/prediction_model/data/torch-geometric"
 
@@ -66,13 +65,12 @@ Data preparation for the HIV dataset.
 Produces a train, validation, and test data loader, where the data is split by molecular scaffold similarity.
 """
 def prepare_train_val_test_data(dataset, frac_train=0.8, frac_val=0.1, frac_test=0.1, batch_size=32):
-    global molecule_scaler, bond_scaler, atom_scaler
+    from prediction_model.datasets.molecule_dataset import MoleculeDataset
 
     # Check if train and test data already exist.
-    main_path = str(Path().absolute()) + "/prediction_model/data/torch-geometric/hiv/normalized"
-    train_path = main_path + "/train.pt"
-    test_path = main_path + "/test.pt"
-    val_path = main_path + "/val.pt"
+    train_path = DATASET_PATH + "/train.pt"
+    test_path = DATASET_PATH + "/test.pt"
+    val_path = DATASET_PATH + "/val.pt"
     if (not path.exists(train_path) or path.getsize(train_path) == 0) or (not path.exists(test_path)
         or path.getsize(test_path) == 0) or (not path.exists(val_path) or path.getsize(val_path) == 0):
         # Split the dataset into train and test datasets by scaffold.
@@ -83,21 +81,20 @@ def prepare_train_val_test_data(dataset, frac_train=0.8, frac_val=0.1, frac_test
 
         # Create datasets for the train and test data which normalize them.
         print("Creating train, validation, and test datasets and normalizing them...")
-        train_dataset = MoleculeDataset(root=main_path, name="train", dataset=train_dataset)
+        train_dataset = MoleculeDataset(root=DATASET_PATH, name="train", dataset=train_dataset)
         molecule_scaler, bond_scaler, atom_scaler = train_dataset.get_scalers()
-        validation_dataset = MoleculeDataset(root=main_path, name="val", dataset=val_dataset, 
+        validation_dataset = MoleculeDataset(root=DATASET_PATH, name="val", dataset=val_dataset, 
                                              molecule_scaler=molecule_scaler, bond_scaler=bond_scaler, 
                                              atom_scaler=atom_scaler)
         if frac_test > 0:
-            test_dataset = MoleculeDataset(root=main_path, name="test", dataset=test_dataset,
+            test_dataset = MoleculeDataset(root=DATASET_PATH, name="test", dataset=test_dataset,
                                            molecule_scaler=molecule_scaler, bond_scaler=bond_scaler, 
                                            atom_scaler=atom_scaler)
     else:
         # Get datasets.
-        train_dataset = MoleculeDataset(root=main_path, name="train")
-        validation_dataset = MoleculeDataset(root=main_path, name="val")
-        test_dataset = MoleculeDataset(root=main_path, name="test")
-        molecule_scaler, bond_scaler, atom_scaler = train_dataset.get_scalers()
+        train_dataset = MoleculeDataset(root=DATASET_PATH, name="train")
+        validation_dataset = MoleculeDataset(root=DATASET_PATH, name="val")
+        test_dataset = MoleculeDataset(root=DATASET_PATH, name="test")
 
     # Create data loaders for train, validation, and test data.
     train_loader = ExtendedDataLoader(train_dataset, sampler=True, batch_size=batch_size, 
@@ -185,7 +182,9 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
     if not final:
         # Test the ensembled model.
         aps, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device, 1)
+        print()
         print("Results of final ensembled model: APS=" + str(aps) + ", ROC AUC=" + str(roc_auc))
+        print()
 
     # Save each of the models to the save path.
     for idx, model in enumerate(models):
@@ -213,12 +212,18 @@ def get_hiv_classifier(num_train_epochs, ensemble_size, torch_device, num_opt_it
 
     # Initialize models. Everything should exist already so don't need data loaders.
     _, _, atom_dim, bond_dim, features_dim = get_data()
-    models = generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, 
-                                         torch_device, None, None, num_opt_iters, num_train_epochs)
+    models, _, _ = generate_initial_hiv_models(ensemble_size, atom_dim, bond_dim, features_dim, 
+                                               torch_device, None, None, None, num_opt_iters, 
+                                               num_train_epochs, 0, 0)
     
     # Load in each model's state dict.
     for idx, model in enumerate(models):
         model.load_state_dict(torch.load(get_model_state_dict_path(idx)))
 
+    # Get scalers.
+    from prediction_model.datasets.molecule_dataset import MoleculeDataset
+    train_dataset = MoleculeDataset(root=DATASET_PATH, name="train")
+    molecule_scaler, bond_scaler, atom_scaler = train_dataset.get_scalers()
+
     # Create HIV classifier model object and return.
-    return HIVClassifier(models, molecule_scaler, bond_scaler, atom_scaler, torch_device).to(torch_device)
+    return HIVClassifier(models, molecule_scaler, bond_scaler, atom_scaler, torch_device)   

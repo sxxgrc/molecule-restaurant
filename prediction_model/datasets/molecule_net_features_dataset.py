@@ -94,9 +94,10 @@ Returns:
     - edge_attr : The features for each edge
     - num_bonds_per_atom : Mapping of the number of bonds in each atom
 """
-def generate_bond_features(mol):
+def generate_bond_features(mol, x):
     num_bonds_per_atom = [0] * len(mol.GetAtoms())
     edge_indices, edge_attrs = [], []
+
     for bond in mol.GetBonds():
         i = bond.GetBeginAtomIdx()
         j = bond.GetEndAtomIdx()
@@ -169,10 +170,10 @@ class MoleculeNetFeaturesDataset(MoleculeNet):
             x, num_atoms_per_mol = generate_atom_features(mol)
 
             # Generate the edge features for the molecule.
-            edge_index, edge_attr, num_bonds_per_atom = generate_bond_features(mol)
+            edge_index, edge_attr, num_bonds_per_atom = generate_bond_features(mol, x)
 
             # Generate feature vector for molecule.
-            features = torch.as_tensor(features_generator(mol))
+            features = torch.as_tensor(features_generator(smiles))
 
             # Create data item for this molecule.
             data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y,
