@@ -6,6 +6,8 @@ import torch, subprocess, json, os, numpy, importlib
 
 from pathlib import Path
 
+from os import path
+
 from prediction_model import get_hiv_classifier
 
 from rdkit import Chem
@@ -67,7 +69,6 @@ subprocess.run(["python", "external_models/molecule-chef/scripts/evaluate/" +
                 "--nbest=5"])
 print("Done!")
 print()
-exit
 
 # Compute metrics for molecules.
 metrics_config = str(Path().absolute()) + "/external_models/molecule_metrics.json"

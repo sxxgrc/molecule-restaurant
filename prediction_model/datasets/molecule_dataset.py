@@ -22,7 +22,9 @@ class MoleculeDataset(InMemoryDataset):
         self.atom_scaler = atom_scaler
         self.dummy = dummy
         super(MoleculeDataset, self).__init__(root, None, None, None)
-        self.data, self.slices = torch.load(self.processed_paths[0])
+
+        if (not dummy):
+            self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
     def raw_dir(self):
@@ -114,8 +116,7 @@ class MoleculeDataset(InMemoryDataset):
     testing datasets.
     """
     def process(self):
-        # Do nothing for dummy.
-        if self.dummy:
+        if (self.dummy):
             return
 
         # If any of the scalers are None they must all be None so we create them.

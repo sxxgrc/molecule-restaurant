@@ -182,6 +182,15 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
                 test_prediction_model, torch_device, loss_pos_weight, 1, lr, clip, get_model_state_dict_path,
                 start_idx)
 
+    # Load in any other models for final testing.
+    if (start_idx > 0):
+        additional_models, _, _ = generate_initial_hiv_models(start_idx, atom_dim, bond_dim, features_dim, 
+                                 torch_device, train_loader, validation_loader, test_loader, num_opt_iters, 
+                                 num_train_epochs, loss_pos_weight, 1)
+        for idx in range(start_idx):
+            additional_models[idx].load_state_dict(torch.load(get_model_state_dict_path(idx)))
+        models = additional_models + models
+
     # Test the ensembled model.
     if final:
         aps, roc_auc = test_ensemble(models, validation_loader, get_predictions, torch_device, 1)

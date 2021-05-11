@@ -12,8 +12,6 @@ This code uses, as submodules, a fork of the original code for the Molecule Chef
 
 The original code for the directed MPNN, by Yang et al., which our HIV classifier is based off, can be found at https://github.com/chemprop/chemprop.
 
-&nbsp;
-
 ## Topics
 
 - [Overview](#Overview)
@@ -29,13 +27,9 @@ The original code for the directed MPNN, by Yang et al., which our HIV classifie
     * [Running Everything from Scratch](#Running-Everything-from-Scratch)
 - [Viewing Results](#Viewing-Results)
 
-&nbsp;
-
 ## Hardware / Software Used for Testing
 
 We used Pytorch with an Nvidia GPU, via CUDA, on a Debian system to test this code. We recommend using a similar configuration in order to ensure everything works as expected, as no other configurations were tested.
-
-&nbsp;
 
 ## Setup
 
@@ -47,11 +41,9 @@ Anaconda can be installed following https://docs.anaconda.com/anaconda/install/ 
 
 The Unzip program can be installed by `sudo apt-get install unzip` or a similar command for your specific OS.
 
-&nbsp;
-
 ### Installation
 
-You can install all of the required packages for this program using the provided `setup_molecule_restaurant.sh` script. Specifically, you should do the following in order to get everything ready.
+You can install all of the required packages for this program using the provided `setup_molecule_restaurant.sh` script. This script will also take care of downloading the pretrained weights for the ensemble D-MPNNs and the Molecular Transformer model. Specifically, you should do the following in order to get everything ready.
 
 Set up a new conda environment and activate it:
 
@@ -60,13 +52,11 @@ conda create -n molecule-restaurant
 conda activate molecule-restaurant
 ```
 
-Install the required libraries for the program:
+Install the required libraries for the program and download pretrained models:
 
 ```
 ./setup_molecule_restaurant.sh
 ```
-
-&nbsp;
 
 ## Usage
 
@@ -80,8 +70,6 @@ As we use various submodules along with the main program, the Python path for yo
 
 This needs to be run every time you launch a new shell instance and intend to run this program.
 
-&nbsp;
-
 ### Main Script for Generating Molecules
 
 The main entrypoint for generating molecules using the model is the `generate_molecules.py` script which can be called by:
@@ -91,8 +79,6 @@ python generate_molecules.py
 ```
 
 One important changeable parameter within this script is the `final` boolean parameter used in the call to `get_hiv_classifier`. This parameter will specify whether the HIV classifier will be tested against part of the dataset during training (`False`) or not (`True`). Specifically, if the value is set to `False` the original HIV dataset will have an 8:1:1 split for training, validation, and testing. Otherwise, the dataset will have a 9:1 split for training and validation, with the validation being used to select the best epoch from training.
-
-&nbsp;
 
 ### Using Preexisting Parameters for Models
 
@@ -108,8 +94,6 @@ These parameters will be used automatically, such that you can simply run the `g
 
 Initial downloading and processing of the HIV and Molecule Chef data will still be done, so the generation process will still initially take a bit of time (albeit a lot less than it would without the provided parameters). The processed data will be stored on your machine however, so further runs will have a substantial decrease in run time.
 
-&nbsp;
-
 ### Running Everything from Scratch
 
 If you do want to run the entire program from scratch, including training and hyperparameter optimization, you can remove the provided parameters for the HIV classifier model and the Molecule Chef model as follows:
@@ -124,8 +108,6 @@ rm molecule_chef_model_best.pth.pick
 You can then run the `generate_molecules.py` script and it will run both the hyperparameter optimization and full ensemble training for the HIV classifier. This will take a while (on the scale of 1-3 days) so be prepared, and make sure to use a capable system for this.
 
 If a broken pipe error happens to occur during the hyperparameter optimization, you can just restart the optimization by stopping and re-running the script. It will pick up near where it left off.
-
-&nbsp;
 
 ## Viewing Results
 
