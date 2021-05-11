@@ -104,7 +104,9 @@ Specifically, we have provided:
   - Trained weights for the Molecule Chef model and property prediction model it uses
   - Trained weights for the Molecular Transformer model (as selected by Bradshaw et al.)
 
-These parameters will be used automatically, such that you can simply run the `generate_molecules.py` script and it will use these, skipping the training portion of the program.
+These parameters will be used automatically, such that you can simply run the `generate_molecules.py` script and it will use these, skipping the training portion of the program. 
+
+Initial downloading and processing of the HIV and Molecule Chef data will still be done, so the generation process will still initially take a bit of time (albeit a lot less than it would without the provided parameters). The processed data will be stored on your machine however, so further runs will have a substantial decrease in run time.
 
 &nbsp;
 

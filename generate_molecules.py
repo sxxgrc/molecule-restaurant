@@ -24,7 +24,7 @@ print("Using PyTorch device : " + str(device))
 
 # Generate the HIV classifier model.
 print("Generating HIV replication inhibition predictor model...")
-hiv_classifier = get_hiv_classifier(num_train_epochs=30, ensemble_size=5, torch_device=device, 
+hiv_classifier = get_hiv_classifier(num_train_epochs=20, ensemble_size=5, torch_device=device, 
                                     num_opt_iters=50, batch_size=512, final=True)
 print("Done!")
 print()

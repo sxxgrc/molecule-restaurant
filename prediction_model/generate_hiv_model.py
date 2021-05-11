@@ -71,8 +71,9 @@ def prepare_train_val_test_data(dataset, frac_train=0.8, frac_val=0.1, frac_test
     train_path = DATASET_PATH + "/train.pt"
     test_path = DATASET_PATH + "/test.pt"
     val_path = DATASET_PATH + "/val.pt"
-    if (not path.exists(train_path) or path.getsize(train_path) == 0) or (not path.exists(test_path)
-        or path.getsize(test_path) == 0) or (not path.exists(val_path) or path.getsize(val_path) == 0):
+    if ((not path.exists(train_path) or path.getsize(train_path) == 0) or 
+        (frac_test > 0 and (not path.exists(test_path) or path.getsize(test_path) == 0)) or 
+        (not path.exists(val_path) or path.getsize(val_path) == 0)):
         # Split the dataset into train and test datasets by scaffold.
         print("Splitting the data...")
         scaffold_splitter = ScaffoldSplitter()
@@ -94,7 +95,8 @@ def prepare_train_val_test_data(dataset, frac_train=0.8, frac_val=0.1, frac_test
         # Get datasets.
         train_dataset = MoleculeDataset(root=DATASET_PATH, name="train")
         validation_dataset = MoleculeDataset(root=DATASET_PATH, name="val")
-        test_dataset = MoleculeDataset(root=DATASET_PATH, name="test")
+        if frac_test > 0:
+            test_dataset = MoleculeDataset(root=DATASET_PATH, name="test")
 
     # Create data loaders for train, validation, and test data.
     train_loader = ExtendedDataLoader(train_dataset, sampler=True, batch_size=batch_size, 
@@ -151,7 +153,7 @@ def get_model_state_dict_path(model_idx):
 """
 Main method for generating the fully trained HIV classifier.
 """
-def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_iters, batch_size, final):
+def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_iters, batch_size, final, start_idx):
     print()
     print("Generating a new HIV replication inhibition classifier. Mind the noise!")
 
@@ -177,18 +179,18 @@ def generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_i
     # Train the ensembled models.
     print("Training the ensemble...")
     train_ensemble(models, num_train_epochs, train_loader, validation_loader, train_prediction_model,
-                test_prediction_model, torch_device, loss_pos_weight, 1, lr, clip)
+                test_prediction_model, torch_device, loss_pos_weight, 1, lr, clip, get_model_state_dict_path,
+                start_idx)
 
-    if not final:
-        # Test the ensembled model.
+    # Test the ensembled model.
+    if final:
+        aps, roc_auc = test_ensemble(models, validation_loader, get_predictions, torch_device, 1)
+    else:
         aps, roc_auc = test_ensemble(models, test_loader, get_predictions, torch_device, 1)
-        print()
-        print("Results of final ensembled model: APS=" + str(aps) + ", ROC AUC=" + str(roc_auc))
-        print()
-
-    # Save each of the models to the save path.
-    for idx, model in enumerate(models):
-        torch.save(model.state_dict(), get_model_state_dict_path(idx))
+    
+    print()
+    print("Results of final ensembled model: APS=" + str(aps) + ", ROC AUC=" + str(roc_auc))
+    print()
 
 """
 Gets a trained HIV classifier. If the model already exists on disk, simply
@@ -207,7 +209,8 @@ def get_hiv_classifier(num_train_epochs, ensemble_size, torch_device, num_opt_it
     for model_idx in range(ensemble_size):
         model_path = get_model_state_dict_path(model_idx)
         if not path.exists(model_path) or not path.getsize(model_path) > 0:
-            generate_hiv_models(num_train_epochs, ensemble_size, torch_device, num_opt_iters, batch_size, final)
+            generate_hiv_models(num_train_epochs, ensemble_size - model_idx, torch_device, num_opt_iters, 
+                                batch_size, final, model_idx)
             break
 
     # Initialize models. Everything should exist already so don't need data loaders.
@@ -222,7 +225,7 @@ def get_hiv_classifier(num_train_epochs, ensemble_size, torch_device, num_opt_it
 
     # Get scalers.
     from prediction_model.datasets.molecule_dataset import MoleculeDataset
-    train_dataset = MoleculeDataset(root=DATASET_PATH, name="train")
+    train_dataset = MoleculeDataset(root=DATASET_PATH, name="dummy", dummy=True)
     molecule_scaler, bond_scaler, atom_scaler = train_dataset.get_scalers()
 
     # Create HIV classifier model object and return.

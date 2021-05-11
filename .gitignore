@@ -4,3 +4,4 @@ out
 molecular_transformer_weights.pt
 setup_log
 tb_logs/
+local_search_results.pick

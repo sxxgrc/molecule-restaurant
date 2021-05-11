@@ -14,12 +14,13 @@ This will normalize the atom, edge, and molecule features within that dataset an
 a new copy of it.
 """
 class MoleculeDataset(InMemoryDataset):
-    def __init__(self, root, name, dataset=None, molecule_scaler=None, bond_scaler=None, atom_scaler=None):
+    def __init__(self, root, name, dataset=None, molecule_scaler=None, bond_scaler=None, atom_scaler=None, dummy=False):
         self.dataset = dataset
         self.name = name
         self.molecule_scaler = molecule_scaler
         self.bond_scaler = bond_scaler
         self.atom_scaler = atom_scaler
+        self.dummy = dummy
         super(MoleculeDataset, self).__init__(root, None, None, None)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -113,6 +114,10 @@ class MoleculeDataset(InMemoryDataset):
     testing datasets.
     """
     def process(self):
+        # Do nothing for dummy.
+        if self.dummy:
+            return
+
         # If any of the scalers are None they must all be None so we create them.
         if self.molecule_scaler is None:
             self.generate_scalers()
