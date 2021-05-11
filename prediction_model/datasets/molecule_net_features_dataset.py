@@ -129,6 +129,7 @@ def generate_bond_features(mol, x):
 New dataset class to use for storing the data. This data will wrap around
 the generic torch-geometric dataset, providing additional feature vectors
 for each molecule as well.
+Based off the underlying MoleculeNet dataset.
 """
 class MoleculeNetFeaturesDataset(MoleculeNet):
     def __init__(self, root, name):

@@ -46,21 +46,21 @@ gdown https://drive.google.com/u/0/uc?id=1ogXzAg71BOs9SBrVt-umgcdc1_0ijUvU >>set
 
 
 
-
+# TODO: May not need.
 
 # Install requirements for molecule chef.
-pip3 install --no-deps -r external_models/molecule-chef/requirements.txt >>setup_log 2>&1
-pip install dataclasses >>setup_log 2>&1
-conda install -y -c intel mkl_random >>setup_log 2>&1
-conda install -y -c intel mkl_fft >>setup_log 2>&1
-pip install tensorflow >>setup_log 2>&1
+# pip3 install --no-deps -r external_models/molecule-chef/requirements.txt >>setup_log 2>&1
+# pip install dataclasses >>setup_log 2>&1
+# conda install -y -c intel mkl_random >>setup_log 2>&1
+# conda install -y -c intel mkl_fft >>setup_log 2>&1
+# pip install tensorflow >>setup_log 2>&1
 
-pip install git+https://github.com/PatWalters/rd_filters.git >>setup_log 2>&1
+# pip install git+https://github.com/PatWalters/rd_filters.git >>setup_log 2>&1
 
-# Install requirements for molecule transformer.
-conda install -y future six tqdm pandas >>setup_log 2>&1
-pip install torchtext==0.3.1 >>setup_log 2>&1
-pip install -e external_models/MolecularTransformer >>setup_log 2>&1
+# # Install requirements for molecule transformer.
+# conda install -y future six tqdm pandas >>setup_log 2>&1
+# pip install torchtext==0.3.1 >>setup_log 2>&1
+# pip install -e external_models/MolecularTransformer >>setup_log 2>&1
 
 
 echo "Done!"

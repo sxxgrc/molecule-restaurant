@@ -1,8 +1,8 @@
 {
-    "clip": 8.5,
-    "dropout_prob": 0.25,
-    "hidden_size": 900.0,
-    "learning_rate": 0.0017376229107744126,
+    "clip": 10.0,
+    "dropout_prob": 0.30000000000000004,
+    "hidden_size": 2400.0,
+    "learning_rate": 0.0002864341947007646,
     "message_passing_depth": 3.0,
-    "num_ffn_layers": 4.0
+    "num_ffn_layers": 5.0
 }
