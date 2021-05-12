@@ -78,8 +78,8 @@ hiv_path = metrics_output + "hiv_replication_inhibition_probability.pt"
 print("Computing metrics for molecules...")
 
 # Compute QED and HIV metrics.
+smiles = []
 with open(smiles_path, "r") as molecules_file, open(qed_path, "w") as qed_file, open(hiv_path, "w") as hiv_file:
-    smiles = []
     hiv_results = []
     qed_results = []
     for molecule_smiles in molecules_file:
@@ -101,5 +101,9 @@ with open(smiles_path, "r") as molecules_file, open(qed_path, "w") as qed_file, 
     for idx in range(len(smiles)):
         hiv_file.write(smiles[hiv_sort_indices[idx]] + " " + str(hiv_results[hiv_sort_indices[idx]]) + "\n")
         qed_file.write(smiles[qed_sort_indices[idx]] + " " + str(qed_results[qed_sort_indices[idx]]) + "\n")
+
+with open(smiles_path, "w") as f:
+    for idx in range(len(smiles)):
+        f.write(smiles[idx] + "\n")
 
 print("Done!")
