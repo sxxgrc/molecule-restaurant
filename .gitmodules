@@ -3,4 +3,4 @@
 	url = https://github.com/sxxgrc/molecule-chef.git
 [submodule "external_models/MolecularTransformer"]
 	path = external_models/MolecularTransformer
-	url = https://github.com/pschwllr/MolecularTransformer.git
+	url = https://github.com/sxxgrc/MolecularTransformer.git

@@ -42,7 +42,7 @@ if not path.exists(molecule_chef_data_path) or not path.getsize(molecule_chef_da
 
 best_molecule_chef_weights = (str(Path().absolute()) + "/molecule_chef_model_best.pth.pick")
 if not path.exists(best_molecule_chef_weights) or not path.getsize(best_molecule_chef_weights) > 0:
-    print("Generating and training the Molecule Chef model for creating reactants...")
+    print("Generating and training the Molecule Chef model...")
     molecule_chef_train.train_molecule_chef_qed_hiv(hiv_classifier, predictor_label_to_optimize=0)
     print("Done!")
     print()
@@ -73,23 +73,9 @@ print()
 # Compute metrics for molecules.
 metrics_config = str(Path().absolute()) + "/external_models/molecule_metrics.json"
 metrics_output = output_folder + "metrics/"
-molecule_chef_metrics_path = metrics_output + "molecule_chef_metrics.pt"
 qed_path = metrics_output + "qed_values.pt"
 hiv_path = metrics_output + "hiv_replication_inhibition_probability.pt"
 print("Computing metrics for molecules...")
-
-# Modify molecule chef metrics config file to use actual products.
-with open(metrics_config, "r+") as f:
-    data = json.load(f)
-    data["data_dir"] = output_folder
-os.remove(metrics_config)
-with open(metrics_config, 'w') as f:
-    json.dump(data, f, indent=4)
-
-# Compute molecule chef metrics.
-with open(molecule_chef_metrics_path, "w") as f:
-    subprocess.run(["python", "external_models/molecule-chef/scripts/evaluate/generation/metrics/" +
-                    "evaluate_metrics.py", metrics_config], stdout=f, stderr=subprocess.STDOUT)
 
 # Compute QED and HIV metrics.
 with open(smiles_path, "r") as molecules_file, open(qed_path, "w") as qed_file, open(hiv_path, "w") as hiv_file:
@@ -97,16 +83,20 @@ with open(smiles_path, "r") as molecules_file, open(qed_path, "w") as qed_file, 
     hiv_results = []
     qed_results = []
     for molecule_smiles in molecules_file:
-        smiles.append(molecule_smiles)
+        molecule_smiles = molecule_smiles.rstrip()
+        molecule = Chem.MolFromSmiles(molecule_smiles)
+
+        if (molecule is None):
+            continue
 
         # Compute metrics.
+        smiles.append(molecule_smiles)
         hiv_results.append(hiv_classifier.predict(molecule_smiles))
-        molecule = Chem.MolFromSmiles(molecule_smiles)
         qed_results.append(Chem.QED.qed(molecule))
 
     # Sort the metrics and output to respective files.
-    hiv_sort_indices = numpy.argsort(hiv_results)[::-1]
-    qed_sort_indices = numpy.argsort(qed_results)
+    hiv_sort_indices = numpy.argsort(hiv_results)
+    qed_sort_indices = numpy.argsort(qed_results)[::-1]
 
     for idx in range(len(smiles)):
         hiv_file.write(smiles[hiv_sort_indices[idx]] + " " + str(hiv_results[hiv_sort_indices[idx]]) + "\n")
